@@ -1,0 +1,30 @@
+{
+    "cli": {
+        "version": ">= 13.2.0",
+        "appVersionSource": "remote"
+    },
+    "build": {
+        "preview": {
+            "distribution": "internal",
+            "android": {
+                "buildType": "apk",
+                "gradleCommand": ":app:assembleRelease"
+            },
+            "ios": {
+                "simulator": true
+            }
+        },
+        "production": {
+            "distribution": "store",
+            "android": {
+                "buildType": "app-bundle"
+            },
+            "ios": {
+                "simulator": false
+            }
+        }
+    },
+    "submit": {
+        "production": {}
+    }
+}
