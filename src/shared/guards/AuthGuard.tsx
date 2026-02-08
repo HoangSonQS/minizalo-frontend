@@ -24,7 +24,11 @@ export function AuthGuard({
 }: AuthGuardProps) {
     const { accessToken, isHydrated } = useAuthStore();
 
+    // Chưa hydrate: với requireAuth không render nội dung bảo vệ (tránh lóe tab rồi mới redirect)
     if (!isHydrated) {
+        if (mode === "requireAuth") {
+            return <Redirect href={loginPath as any} />;
+        }
         return <>{children}</>;
     }
 
