@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator, TextInputProps } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, TextInputProps } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { authStyles, COLORS } from "../styles";
 
 // Header với nút back

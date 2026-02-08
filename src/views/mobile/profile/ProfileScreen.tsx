@@ -1,0 +1,155 @@
+import React, { useState } from "react";
+import {
+    View,
+    Text,
+    TextInput,
+    Image,
+    TouchableOpacity,
+    ScrollView,
+    StatusBar,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
+import { profileStyles, PROFILE_COLORS } from "./styles";
+import type { UserProfile } from "@/shared/services/types";
+
+type IconName = ComponentProps<typeof Ionicons>["name"];
+
+// Icon trong ô vuông xanh (giống Zalo): cloud, sparkles, folder, time, qr-code, shield, lock
+const ListIcon = ({ name }: { name: IconName }) => (
+    <View style={profileStyles.listItemIcon}>
+        <Ionicons name={name} size={18} color="#fff" />
+    </View>
+);
+
+interface MenuItemProps {
+    icon: IconName;
+    title: string;
+    subtitle?: string;
+    onPress?: () => void;
+}
+
+function MenuItem({ icon, title, subtitle, onPress }: MenuItemProps) {
+    return (
+        <TouchableOpacity
+            style={profileStyles.listItem}
+            onPress={onPress}
+            activeOpacity={0.7}
+        >
+            <ListIcon name={icon} />
+            <View style={profileStyles.listItemContent}>
+                <Text style={profileStyles.listItemTitle}>{title}</Text>
+                {subtitle ? (
+                    <Text style={profileStyles.listItemSubtitle} numberOfLines={1}>
+                        {subtitle}
+                    </Text>
+                ) : null}
+            </View>
+            <Text style={profileStyles.listItemArrow}>›</Text>
+        </TouchableOpacity>
+    );
+}
+
+interface ProfileScreenProps {
+    user?: UserProfile | null;
+}
+
+export default function ProfileScreen({ user }: ProfileScreenProps) {
+    const router = useRouter();
+    const [searchQuery, setSearchQuery] = useState("");
+
+    // Tên tài khoản vừa đăng nhập: ưu tiên displayName, rồi username (SĐT/email)
+    const displayName =
+        (user?.displayName?.trim() || user?.username?.trim() || "").trim() || "Người dùng";
+    const avatarUrl = user?.avatarUrl ?? null;
+
+    return (
+        <SafeAreaView style={profileStyles.container} edges={["top"]}>
+            <StatusBar barStyle="light-content" backgroundColor={PROFILE_COLORS.background} />
+
+            {/* Search + Settings */}
+            <View style={profileStyles.searchRow}>
+                <View style={profileStyles.searchBox}>
+                    <Ionicons name="search" size={20} color={PROFILE_COLORS.textSecondary} />
+                    <TextInput
+                        style={profileStyles.searchInput}
+                        placeholder="Tìm kiếm"
+                        placeholderTextColor={PROFILE_COLORS.textSecondary}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                </View>
+                <TouchableOpacity
+                    style={profileStyles.settingsButton}
+                    onPress={() => router.push("/(tabs)/settings")}
+                >
+                    <Ionicons name="settings-outline" size={24} color={PROFILE_COLORS.text} />
+                </TouchableOpacity>
+            </View>
+
+            {/* Profile block */}
+            <TouchableOpacity
+                style={profileStyles.profileSection}
+                activeOpacity={0.8}
+                onPress={() => router.push("/(tabs)/account-edit")}
+            >
+                <View>
+                    {avatarUrl ? (
+                        <Image
+                            source={{ uri: avatarUrl }}
+                            style={profileStyles.avatar}
+                        />
+                    ) : (
+                        <View style={profileStyles.avatar} />
+                    )}
+                    <View style={profileStyles.avatarBadge}>
+                        <Ionicons name="add" size={18} color={PROFILE_COLORS.text} />
+                    </View>
+                </View>
+                <View style={profileStyles.nameRow}>
+                    <Text style={profileStyles.displayName}>{displayName}</Text>
+                    <Ionicons name="time-outline" size={20} color={PROFILE_COLORS.textSecondary} />
+                </View>
+            </TouchableOpacity>
+
+            {/* Menu list - bấm vào không chuyển màn (để sau xử lý chức năng riêng từng mục) */}
+            <ScrollView style={profileStyles.list} showsVerticalScrollIndicator={false}>
+                <MenuItem
+                    icon="cloud"
+                    title="zCloud"
+                    subtitle="Không gian lưu trữ dữ liệu trên đám mây"
+                />
+                <MenuItem
+                    icon="sparkles"
+                    title="zStyle – Nổi bật trên Zalo"
+                    subtitle="Hình nền và nhạc cho cuộc gọi Zalo"
+                />
+                <MenuItem
+                    icon="folder"
+                    title="My Documents"
+                    subtitle="Lưu trữ các tin nhắn quan trọng"
+                />
+                <MenuItem
+                    icon="time"
+                    title="Dữ liệu trên máy"
+                    subtitle="Quản lý dữ liệu Zalo của bạn"
+                />
+                <MenuItem
+                    icon="qr-code"
+                    title="Ví QR"
+                    subtitle="Lưu trữ và xuất trình các mã QR quan trọng"
+                />
+                <MenuItem
+                    icon="shield-checkmark"
+                    title="Tài khoản và bảo mật"
+                />
+                <MenuItem
+                    icon="lock-closed"
+                    title="Quyền riêng tư"
+                />
+            </ScrollView>
+        </SafeAreaView>
+    );
+}
