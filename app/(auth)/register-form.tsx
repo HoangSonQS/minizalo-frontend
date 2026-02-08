@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
 const RegisterFormView = Platform.select({
-    web: require("../../src/views/web/auth/LoginWeb").default, // TODO: Create RegisterWeb
+    web: require("../../src/views/web/auth/RegisterFormWeb").default,
     default: require("../../src/views/mobile/auth/screens/RegisterFormScreen").default,
 });
 

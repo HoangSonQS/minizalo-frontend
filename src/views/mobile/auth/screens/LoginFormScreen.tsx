@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { View, StatusBar, KeyboardAvoidingView, Platform, Modal, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import authService from "../../../../services/authService";
+import { useAuthStore } from "@/shared/store/authStore";
 import { authStyles } from "../styles";
 import { AuthHeader, AuthTitle, AuthInput, AuthButton, AuthLink } from "../components";
 
 export default function LoginFormScreen() {
     const router = useRouter();
+    const login = useAuthStore((s) => s.login);
     const [phone, setPhone] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -35,14 +36,11 @@ export default function LoginFormScreen() {
 
         setLoading(true);
         try {
-            const response = await authService.signin({
+            await login({
                 username: phone.trim(),
                 password,
             });
-            console.log("Login success! Tokens:", response);
-            Alert.alert("Thành công", "Đăng nhập thành công!", [
-                { text: "OK", onPress: () => router.replace("/(tabs)") }
-            ]);
+            router.replace("/(tabs)");
         } catch (error: any) {
             const serverMessage = error.response?.data?.message;
             let message = "Sai tên đăng nhập hoặc mật khẩu. Vui lòng thử lại.";
@@ -83,7 +81,7 @@ export default function LoginFormScreen() {
                 <AuthTitle title="Đăng nhập" />
 
                 <AuthInput
-                    placeholder="Số điện thoại"
+                    placeholder="Số điện thoại hoặc email"
                     value={phone}
                     onChangeText={setPhone}
                     keyboardType="phone-pad"
