@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { useRouter, usePathname } from "expo-router";
+import SettingsPanel from "./SettingsPanel";
 
 const SIDEBAR_BG = "#004A99";
 const ACTIVE_BG = "rgba(255,255,255,0.18)";
@@ -47,19 +48,19 @@ const iconSettings = (
     </svg>
 );
 
-const items: { href: string; label: string; icon: React.ReactNode }[] = [
+const navItems: { href: string; label: string; icon: React.ReactNode }[] = [
     { href: "/(tabs)", label: "Tin nhắn", icon: iconMessage },
     { href: "/(tabs)/contacts", label: "Danh bạ", icon: iconContacts },
     { href: "/(tabs)/zalo-cloud", label: "Zalo Cloud", icon: iconCloudZ },
     { href: "/(tabs)/files", label: "Thư mục", icon: iconFolder },
     { href: "/(tabs)/explore", label: "Khám phá", icon: iconPlus },
     { href: "/(tabs)/work", label: "Công việc", icon: iconBriefcase },
-    { href: "/(tabs)/settings", label: "Cài đặt", icon: iconSettings },
 ];
 
 export default function WebSidebar() {
     const router = useRouter();
     const pathname = usePathname();
+    const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
     const isActive = (href: string) => {
         if (href === "/(tabs)") return pathname === "/(tabs)" || pathname === "/(tabs)/";
@@ -67,6 +68,7 @@ export default function WebSidebar() {
     };
 
     return (
+        <div style={{ display: "flex", flexShrink: 0 }}>
         <aside
             style={{
                 width: 72,
@@ -122,8 +124,8 @@ export default function WebSidebar() {
             {/* Khoảng trống giữa */}
             <div style={{ flex: 1, minHeight: 24 }} />
 
-            {/* Zalo Cloud, Thư mục, Khám phá, Công việc, Cài đặt */}
-            {items.slice(2).map((item) => (
+            {/* Zalo Cloud, Thư mục, Khám phá, Công việc */}
+            {navItems.slice(2).map((item) => (
                 <NavItem
                     key={item.href}
                     href={item.href}
@@ -133,7 +135,21 @@ export default function WebSidebar() {
                     onClick={() => router.push(item.href as any)}
                 />
             ))}
+
+            {/* Cài đặt - mở panel thay vì chuyển trang */}
+            <NavItem
+                href="/(tabs)/settings"
+                label="Cài đặt"
+                icon={iconSettings}
+                active={showSettingsPanel}
+                onClick={() => setShowSettingsPanel((v) => !v)}
+            />
         </aside>
+
+        {showSettingsPanel && (
+            <SettingsPanel onClose={() => setShowSettingsPanel(false)} />
+        )}
+        </div>
     );
 }
 
