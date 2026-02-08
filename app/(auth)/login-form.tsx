@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
 const LoginFormView = Platform.select({
-    web: require("../../src/views/web/auth/LoginWeb").default,
+    web: require("../../src/views/web/auth/LoginFormWeb").default,
     default: require("../../src/views/mobile/auth/screens/LoginFormScreen").default,
 });
 

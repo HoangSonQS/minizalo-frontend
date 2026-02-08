@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import authService from "../../../../services/authService";
+import authService from "@/shared/services/authService";
 import { authStyles } from "../styles";
 import { AuthHeader, AuthTitle, AuthInput, AuthButton } from "../components";
 
