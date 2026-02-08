@@ -17,6 +17,32 @@ const api = axios.create({
     headers: { "Content-Type": "application/json" },
 });
 
+// Khi gặp 401: thử refresh token, retry request; nếu refresh thất bại thì clear token
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true;
+            try {
+                const refreshed = await useAuthStore.getState().refreshAuth();
+                if (refreshed) {
+                    const token = useAuthStore.getState().accessToken;
+                    if (token) {
+                        originalRequest.headers = originalRequest.headers || {};
+                        originalRequest.headers.Authorization = `Bearer ${token}`;
+                        return api(originalRequest);
+                    }
+                }
+            } catch {
+                // ignore
+            }
+            useAuthStore.getState().clear();
+        }
+        return Promise.reject(error);
+    }
+);
+
 export const userService = {
     getProfile: async (): Promise<UserProfile> => {
         const { data } = await api.get<UserProfile>("/users/me", {

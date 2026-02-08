@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "expo-router";
+import { useUserStore } from "@/shared/store/userStore";
+import { useAuthStore } from "@/shared/store/authStore";
 import SettingsPanel from "./SettingsPanel";
 
 const SIDEBAR_BG = "#004A99";
@@ -61,6 +63,16 @@ export default function WebSidebar() {
     const router = useRouter();
     const pathname = usePathname();
     const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+    const hasToken = !!useAuthStore((s) => s.accessToken);
+    const { profile, fetchProfile } = useUserStore();
+
+    useEffect(() => {
+        if (hasToken && !profile) fetchProfile();
+    }, [hasToken, profile, fetchProfile]);
+
+    const avatarUrl = profile?.avatarUrl || null;
+    const displayName = profile?.displayName || profile?.username || "";
+    const initial = (displayName && displayName.charAt(0).toUpperCase()) || "U";
 
     const isActive = (href: string) => {
         if (href === "/(tabs)") return pathname === "/(tabs)" || pathname === "/(tabs)/";
@@ -83,25 +95,38 @@ export default function WebSidebar() {
                 flexShrink: 0,
             }}
         >
-            {/* Avatar */}
-            <div
+            {/* Avatar người dùng */}
+            <button
+                type="button"
+                onClick={() => router.push("/(tabs)/account")}
                 style={{
                     width: 44,
                     height: 44,
                     borderRadius: "50%",
-                    backgroundColor: "rgba(255,255,255,0.25)",
                     marginBottom: 12,
                     overflow: "hidden",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    backgroundColor: avatarUrl ? "transparent" : "rgba(255,255,255,0.25)",
                     color: "#fff",
                     fontSize: 18,
                     fontWeight: 600,
                 }}
             >
-                U
-            </div>
+                {avatarUrl ? (
+                    <img
+                        src={avatarUrl}
+                        alt="Avatar"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                ) : (
+                    initial
+                )}
+            </button>
 
             {/* Tin nhắn - luôn đầu, active khi đang ở tabs */}
             <NavItem

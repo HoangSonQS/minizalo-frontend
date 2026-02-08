@@ -36,15 +36,18 @@ const iconCamera = (
 export default function AccountInfoView() {
     const router = useRouter();
     const { profile, loading, error, fetchProfile } = useUserStore();
-    const hasToken = !!useAuthStore((s) => s.accessToken);
+    const isHydrated = useAuthStore((s) => s.isHydrated);
+    const accessToken = useAuthStore((s) => s.accessToken);
+    const hasToken = !!accessToken;
     const { preview, uploading, error: avatarError, selectFile, upload, hasToken: hasAuth } = useAvatarUpload();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Chỉ gọi API sau khi auth đã rehydrate từ storage (tránh 401 do token chưa kịp có)
     useEffect(() => {
-        if (hasToken) fetchProfile();
-    }, [hasToken, fetchProfile]);
+        if (isHydrated && hasToken) fetchProfile();
+    }, [isHydrated, hasToken, fetchProfile]);
 
-    const onClose = () => router.back();
+    const onClose = () => router.replace("/(tabs)");
 
     const onAvatarClick = () => fileInputRef.current?.click();
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,12 +84,12 @@ export default function AccountInfoView() {
                 onClick={(e) => e.stopPropagation()}
                 style={{
                     backgroundColor: "#fff",
-                    borderRadius: 16,
-                    maxWidth: 520,
+                    borderRadius: 20,
+                    maxWidth: 640,
                     width: "100%",
                     maxHeight: "90vh",
                     overflowY: "auto",
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
                 }}
             >
                 {/* Title + Close */}
@@ -95,11 +98,11 @@ export default function AccountInfoView() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "16px 20px",
+                        padding: "20px 28px",
                         borderBottom: "1px solid #eee",
                     }}
                 >
-                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "#333" }}>
+                    <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: "#333" }}>
                         Thông tin tài khoản
                     </h2>
                     <button
@@ -117,25 +120,32 @@ export default function AccountInfoView() {
                     </button>
                 </div>
 
+                {/* Đợi auth rehydrate từ storage (tránh 401 do token chưa kịp có) */}
+                {!isHydrated && (
+                    <div style={{ padding: 40, textAlign: "center", color: "#666", fontSize: 16 }}>
+                        Đang tải...
+                    </div>
+                )}
                 {/* Loading / Error */}
-                {loading && !displayProfile && (
-                    <div style={{ padding: 40, textAlign: "center", color: "#666" }}>
+                {isHydrated && loading && !displayProfile && (
+                    <div style={{ padding: 40, textAlign: "center", color: "#666", fontSize: 16 }}>
                         Đang tải thông tin tài khoản...
                     </div>
                 )}
-                {error && !displayProfile && (
-                    <div style={{ padding: 24, textAlign: "center" }}>
-                        <p style={{ color: "#e53935", marginBottom: 12 }}>{error}</p>
+                {isHydrated && error && !displayProfile && (
+                    <div style={{ padding: 28, textAlign: "center" }}>
+                        <p style={{ color: "#e53935", marginBottom: 16, fontSize: 16 }}>{error}</p>
                         <button
                             type="button"
                             onClick={() => fetchProfile()}
                             style={{
-                                padding: "8px 16px",
-                                borderRadius: 8,
+                                padding: "10px 20px",
+                                borderRadius: 10,
                                 border: "none",
                                 backgroundColor: "#0068FF",
                                 color: "#fff",
-                                fontSize: 14,
+                                fontSize: 16,
+                                fontWeight: 500,
                                 cursor: "pointer",
                             }}
                         >
@@ -150,24 +160,24 @@ export default function AccountInfoView() {
                 {/* Banner */}
                 <div
                     style={{
-                        height: 120,
+                        height: 160,
                         background: "linear-gradient(135deg, #0068FF 0%, #00C6FF 100%)",
                         borderRadius: "0 0 0 0",
                     }}
                 />
 
                 {/* Avatar + Name */}
-                <div style={{ padding: "0 20px 16px", marginTop: -48 }}>
-                    <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+                <div style={{ padding: "0 28px 20px", marginTop: -60 }}>
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: 20 }}>
                         <div
                             style={{
                                 position: "relative",
-                                width: 96,
-                                height: 96,
+                                width: 120,
+                                height: 120,
                                 borderRadius: "50%",
                                 overflow: "hidden",
-                                border: "3px solid #fff",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                border: "4px solid #fff",
+                                boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
                                 flexShrink: 0,
                             }}
                         >
@@ -187,7 +197,7 @@ export default function AccountInfoView() {
                                         alignItems: "center",
                                         justifyContent: "center",
                                         color: "#666",
-                                        fontSize: 32,
+                                        fontSize: 40,
                                         fontWeight: 600,
                                     }}
                                 >
@@ -209,10 +219,10 @@ export default function AccountInfoView() {
                                     position: "absolute",
                                     right: 0,
                                     bottom: 0,
-                                    width: 32,
-                                    height: 32,
+                                    width: 40,
+                                    height: 40,
                                     borderRadius: "50%",
-                                    border: "2px solid #fff",
+                                    border: "3px solid #fff",
                                     backgroundColor: "#0068FF",
                                     color: "#fff",
                                     cursor: uploading ? "wait" : "pointer",
@@ -224,9 +234,9 @@ export default function AccountInfoView() {
                                 {iconCamera}
                             </button>
                         </div>
-                        <div style={{ flex: 1, paddingBottom: 8 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ fontSize: 20, fontWeight: 600, color: "#333" }}>
+                        <div style={{ flex: 1, paddingBottom: 10 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ fontSize: 26, fontWeight: 600, color: "#333" }}>
                                     {displayName}
                                 </span>
                                 <button
@@ -244,7 +254,7 @@ export default function AccountInfoView() {
                                 </button>
                             </div>
                             {(avatarError || error) && (
-                                <div style={{ fontSize: 12, color: "#e53935", marginTop: 4 }}>
+                                <div style={{ fontSize: 14, color: "#e53935", marginTop: 6 }}>
                                     {avatarError || error}
                                 </div>
                             )}
@@ -255,19 +265,19 @@ export default function AccountInfoView() {
                 {/* Thông tin kinh doanh */}
                 <div
                     style={{
-                        margin: "0 20px 16px",
-                        padding: 16,
+                        margin: "0 28px 20px",
+                        padding: 20,
                         backgroundColor: "#f5f5f5",
-                        borderRadius: 12,
+                        borderRadius: 14,
                     }}
                 >
-                    <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Mô tả</div>
+                    <div style={{ fontSize: 16, color: "#666", marginBottom: 10 }}>Mô tả</div>
                     <a
                         href={displayProfile?.businessDescription || "#"}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
-                            fontSize: 14,
+                            fontSize: 16,
                             color: "#0068FF",
                             textDecoration: "none",
                             wordBreak: "break-all",
@@ -275,17 +285,17 @@ export default function AccountInfoView() {
                     >
                         {displayProfile?.businessDescription || "Chưa cập nhật"}
                     </a>
-                    <div style={{ marginTop: 12 }}>
+                    <div style={{ marginTop: 16 }}>
                         <button
                             type="button"
                             onClick={() => router.push("/(tabs)/account-edit")}
                             style={{
-                                padding: "8px 16px",
-                                borderRadius: 8,
+                                padding: "10px 20px",
+                                borderRadius: 10,
                                 border: "none",
                                 backgroundColor: "#0068FF",
                                 color: "#fff",
-                                fontSize: 14,
+                                fontSize: 16,
                                 fontWeight: 500,
                                 cursor: "pointer",
                             }}
@@ -298,34 +308,34 @@ export default function AccountInfoView() {
                 {/* Thông tin cá nhân */}
                 <div
                     style={{
-                        margin: "0 20px 20px",
-                        padding: 16,
+                        margin: "0 28px 24px",
+                        padding: 20,
                         backgroundColor: "#f5f5f5",
-                        borderRadius: 12,
+                        borderRadius: 14,
                     }}
                 >
-                    <div style={{ fontSize: 14, color: "#333", marginBottom: 12 }}>
+                    <div style={{ fontSize: 16, color: "#333", marginBottom: 14 }}>
                         <strong>Giới tính:</strong> {displayProfile?.gender || "Chưa cập nhật"}
                     </div>
-                    <div style={{ fontSize: 14, color: "#333", marginBottom: 12 }}>
+                    <div style={{ fontSize: 16, color: "#333", marginBottom: 14 }}>
                         <strong>Ngày sinh:</strong> {formatDate(displayProfile?.dateOfBirth) || "Chưa cập nhật"}
                     </div>
-                    <div style={{ fontSize: 14, color: "#333", marginBottom: 8 }}>
+                    <div style={{ fontSize: 16, color: "#333", marginBottom: 10 }}>
                         <strong>Điện thoại:</strong> {displayProfile?.phone || "Chưa cập nhật"}
                     </div>
-                    <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+                    <div style={{ fontSize: 14, color: "#666", marginBottom: 16 }}>
                         Chỉ bạn bè có lưu số của bạn trong danh bạ mới xem được số này.
                     </div>
                     <button
                         type="button"
                         onClick={() => router.push("/(tabs)/account-edit")}
                         style={{
-                            padding: "8px 16px",
-                            borderRadius: 8,
+                            padding: "10px 20px",
+                            borderRadius: 10,
                             border: "none",
                             backgroundColor: "#0068FF",
                             color: "#fff",
-                            fontSize: 14,
+                            fontSize: 16,
                             fontWeight: 500,
                             cursor: "pointer",
                         }}
