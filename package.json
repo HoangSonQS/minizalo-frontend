@@ -6,8 +6,8 @@
     "start": "npx expo start",
     "android": "npx expo run:android",
     "ios": "npx expo run:ios",
-    "web": "cross-env EXPO_PUBLIC_METRO_WEB=1 npx expo start --web",
-    "web:clean": "cross-env EXPO_PUBLIC_METRO_WEB=1 npx expo start --web --clear",
+    "web": "npx expo start --web",
+    "web:clean": "npx expo start --web --clear",
     "lint": "npx expo lint",
     "postinstall": "node scripts/patch-expo-modules-core.js"
   },
