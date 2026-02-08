@@ -1,6 +1,7 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Redirect } from "expo-router";
 import { useAuthStore } from "@/shared/store/authStore";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
 
 type AuthGuardMode = "requireAuth" | "guestOnly";
 
@@ -22,27 +23,62 @@ export function AuthGuard({
     loginPath = "/(auth)/login",
     homePath = "/(tabs)",
 }: AuthGuardProps) {
-    const { accessToken, isHydrated } = useAuthStore();
+    const { accessToken, refreshToken, isHydrated, refreshAuth, clear } = useAuthStore();
+    const [isValidating, setIsValidating] = useState(false);
+    const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
 
-    // Chưa hydrate: với requireAuth không render nội dung bảo vệ (tránh lóe tab rồi mới redirect)
-    if (!isHydrated) {
-        if (mode === "requireAuth") {
-            return <Redirect href={loginPath as any} />;
-        }
-        return <>{children}</>;
+    // Validate token with server when app loads
+    useEffect(() => {
+        const validateToken = async () => {
+            if (isHydrated && refreshToken && isTokenValid === null) {
+                setIsValidating(true);
+                try {
+                    const success = await refreshAuth();
+                    setIsTokenValid(success);
+                    if (!success) {
+                        clear(); // Clear invalid tokens
+                    }
+                } catch {
+                    setIsTokenValid(false);
+                    clear(); // Clear invalid tokens
+                }
+                setIsValidating(false);
+            } else if (isHydrated && !refreshToken) {
+                setIsTokenValid(false);
+            }
+        };
+        validateToken();
+    }, [isHydrated, refreshToken]);
+
+    // Show loading while hydrating or validating
+    if (!isHydrated || (refreshToken && isValidating)) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#0068FF" />
+            </View>
+        );
     }
 
     if (mode === "requireAuth") {
-        if (!accessToken) {
+        if (!accessToken || isTokenValid === false) {
             return <Redirect href={loginPath as any} />;
         }
     }
 
     if (mode === "guestOnly") {
-        if (accessToken) {
+        if (accessToken && isTokenValid !== false) {
             return <Redirect href={homePath as any} />;
         }
     }
 
     return <>{children}</>;
 }
+
+const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#fff",
+    },
+});
