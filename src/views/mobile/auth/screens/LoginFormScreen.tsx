@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, StatusBar, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "@/shared/store/authStore";
+import { useUserStore } from "@/shared/store/userStore";
 import { authStyles } from "../styles";
 import { AuthHeader, AuthTitle, AuthInput, AuthButton, AuthLink } from "../components";
 
@@ -28,6 +29,8 @@ export default function LoginFormScreen() {
                 username: phone.trim(),
                 password,
             });
+            // Tải profile ngay sau đăng nhập để màn Cá nhân hiển thị đúng tên/avatar
+            await useUserStore.getState().fetchProfile();
             router.replace("/(tabs)");
         } catch (error: any) {
             console.error("Login error:", error);

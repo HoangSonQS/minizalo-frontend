@@ -6,10 +6,12 @@ import {
     MessageResponse,
 } from "./types";
 
-const API_BASE_URL =
+// Luôn có /api ở cuối: backend phục vụ tại /api/auth/signup, /api/auth/signin, ...
+const rawBase =
     typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL
         ? process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, "")
         : "http://localhost:8080/api";
+const API_BASE_URL = rawBase.endsWith("/api") ? rawBase : `${rawBase}/api`;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -18,19 +20,26 @@ const api = axios.create({
     },
 });
 
+// Đảm bảo path không có slash thừa (tránh 401 do path không khớp permitAll)
+const authPath = (path: string) => path.startsWith("/") ? path : `/${path}`;
+
 export const authService = {
     signup: async (data: SignupRequest): Promise<MessageResponse> => {
-        const response = await api.post<MessageResponse>("/auth/signup", data);
+        const path = authPath("auth/signup");
+        if (__DEV__) {
+            console.log("[authService] signup URL:", API_BASE_URL + path);
+        }
+        const response = await api.post<MessageResponse>(path, data);
         return response.data;
     },
 
     signin: async (data: LoginRequest): Promise<JwtResponse> => {
-        const response = await api.post<JwtResponse>("/auth/signin", data);
+        const response = await api.post<JwtResponse>(authPath("auth/signin"), data);
         return response.data;
     },
 
     refreshToken: async (refreshToken: string): Promise<JwtResponse> => {
-        const response = await api.post<JwtResponse>("/auth/refreshtoken", {
+        const response = await api.post<JwtResponse>(authPath("auth/refreshtoken"), {
             refreshToken,
         });
         return response.data;
@@ -38,7 +47,7 @@ export const authService = {
 
     logout: async (accessToken: string): Promise<MessageResponse> => {
         const response = await api.post<MessageResponse>(
-            "/auth/logout",
+            authPath("auth/logout"),
             {},
             {
                 headers: {
