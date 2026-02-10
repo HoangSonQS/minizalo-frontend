@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert } from "react-native";
+import { View, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert, TouchableOpacity, Text } from "react-native";
 import { useRouter } from "expo-router";
 import authService from "@/shared/services/authService";
 import { authStyles } from "../styles";
@@ -44,10 +44,17 @@ export default function RegisterFormScreen() {
             Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự");
             return;
         }
+        // Ít nhất 1 chữ hoa, 1 số, 1 ký tự đặc biệt
+        if (!/^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{6,}$/.test(password)) {
+            Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, số và ký tự đặc biệt (!@#$%^&*)");
+            return;
+        }
+
         if (password !== confirmPassword) {
             Alert.alert("Lỗi", "Mật khẩu nhập lại không khớp");
             return;
         }
+
 
         setLoading(true);
         try {
@@ -110,7 +117,7 @@ export default function RegisterFormScreen() {
                         placeholder="Mật khẩu"
                         value={password}
                         onChangeText={setPassword}
-                        secureTextEntry
+                        isPassword
                         disabled={loading}
                     />
 
@@ -118,9 +125,10 @@ export default function RegisterFormScreen() {
                         placeholder="Nhập lại mật khẩu"
                         value={confirmPassword}
                         onChangeText={setConfirmPassword}
-                        secureTextEntry
+                        isPassword
                         disabled={loading}
                     />
+
 
                     <AuthButton
                         title="Đăng ký"

@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AuthGuard } from "@/shared/guards/AuthGuard";
 import WebSidebar from "@/views/web/components/WebSidebar";
 
-// Icon tab bar (mobile) - giống Zalo: Tin nhắn (chat), Danh bạ (people), Khám phá (grid), Tường nhà (newspaper), Cá nhân (person)
+// Icon tab bar (mobile) - giống Zalo: Tin nhắn (chat), Danh bạ (people), Khám phá (grid), Nhật ký (time), Cá nhân (person)
 type IconName = keyof typeof Ionicons.glyphMap;
 const TabIcon = ({
     name,
@@ -48,8 +48,8 @@ export default function TabsLayout() {
                     headerShown: false,
                     tabBarActiveTintColor: "#0068FF",
                     tabBarInactiveTintColor: "#8e8e93",
-                    tabBarStyle: { backgroundColor: "#0d0d0d", borderTopColor: "#2a2a2a" },
-                    tabBarLabelStyle: { fontSize: 11 },
+                    tabBarStyle: { backgroundColor: "#fff", borderTopColor: "#e0e0e0", height: 60, paddingBottom: 8 },
+                    tabBarLabelStyle: { fontSize: 11, marginBottom: 4 },
                 }}
             >
                 <Tabs.Screen
@@ -57,7 +57,7 @@ export default function TabsLayout() {
                     options={{
                         title: "Tin nhắn",
                         tabBarIcon: ({ color, focused }) => (
-                            <TabIcon name="chatbubble" focused={focused} color={color} />
+                            <TabIcon name="chatbubble-ellipses" focused={focused} color={color} />
                         ),
                     }}
                 />
@@ -82,9 +82,9 @@ export default function TabsLayout() {
                 <Tabs.Screen
                     name="work"
                     options={{
-                        title: "Tường nhà",
+                        title: "Nhật ký",
                         tabBarIcon: ({ color, focused }) => (
-                            <TabIcon name="home" focused={focused} color={color} />
+                            <TabIcon name="time" focused={focused} color={color} />
                         ),
                     }}
                 />
@@ -97,6 +97,8 @@ export default function TabsLayout() {
                         ),
                     }}
                 />
+
+                {/* Hidden tabs */}
                 <Tabs.Screen name="account-edit" options={{ href: null }} />
                 <Tabs.Screen name="settings" options={{ href: null }} />
                 <Tabs.Screen name="data" options={{ href: null }} />
