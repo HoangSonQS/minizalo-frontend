@@ -9,11 +9,12 @@ interface ChatItemProps {
     unreadCount?: number;
     isVerified?: boolean; // For the checkmark
     isGroup?: boolean;
+    onPress?: () => void;
 }
 
-export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified }: ChatItemProps) => {
+export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified, onPress }: ChatItemProps) => {
     return (
-        <TouchableOpacity className="flex-row items-center bg-white px-4 py-2.5 active:bg-gray-100">
+        <TouchableOpacity onPress={onPress} className="flex-row items-center bg-white px-4 py-2.5 active:bg-gray-100">
             {/* Avatar Container */}
             <View className="relative mr-3">
                 <Image source={avatar} className="w-[52px] h-[52px] rounded-full bg-gray-200" resizeMode="cover" />

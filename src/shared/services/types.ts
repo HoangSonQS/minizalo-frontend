@@ -4,6 +4,8 @@ export interface SignupRequest {
     phone: string;
     email: string;
     password: string;
+    gender?: string;
+    dateOfBirth?: string;
 }
 
 export interface LoginRequest {

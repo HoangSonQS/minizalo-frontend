@@ -1,5 +1,6 @@
 import React from "react";
-import { View, FlatList, StatusBar, Platform, SafeAreaView } from "react-native";
+import { View, FlatList } from "react-native";
+import { useRouter } from "expo-router";
 import { ChatListHeader } from "../components/ChatListHeader";
 import { PinnedCloudItem } from "../components/PinnedCloudItem";
 import { ChatItem } from "../components/ChatItem";
@@ -11,7 +12,7 @@ const DATA = [
         message: "Zing MP3: [APP] Hãy để KAKA khai...",
         time: "",
         avatar: { uri: "https://ui-avatars.com/api/?name=Media+Box&background=random&color=fff" },
-        unreadCount: 5, // Just to show badge
+        unreadCount: 5,
         isVerified: false,
     },
     {
@@ -50,18 +51,11 @@ const DATA = [
         unreadCount: 3,
         isVerified: true,
     },
-    {
-        id: "6",
-        name: "Cloud của tôi", // This is redundant if we have PinnedCloudItem, but usually it's separate. 
-        // We will filter this out or just not include it in DATA since we have PinnedCloudItem.
-        message: "",
-        time: "",
-        avatar: {},
-        unreadCount: 0,
-    }
 ].filter(item => item.id !== "6");
 
 export default function ChatListScreen() {
+    const router = useRouter();
+
     return (
         <View className="flex-1 bg-white">
             <ChatListHeader />
@@ -81,9 +75,13 @@ export default function ChatListScreen() {
                         time={item.time}
                         unreadCount={item.unreadCount}
                         isVerified={item.isVerified}
+                        onPress={() => router.push({
+                            pathname: "/chat/[id]",
+                            params: { id: item.id, name: item.name }
+                        })}
                     />
                 )}
-                contentContainerStyle={{ paddingBottom: 100 }} // Add padding for tab bar
+                contentContainerStyle={{ paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
             />
         </View>
