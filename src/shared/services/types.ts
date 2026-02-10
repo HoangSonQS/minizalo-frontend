@@ -25,6 +25,10 @@ export interface ApiError {
     status?: number;
 }
 
+// -----------------------------
+// User / Profile
+// -----------------------------
+
 // User profile (khớp UserProfileResponse backend)
 export interface UserProfile {
     id: string;
@@ -52,3 +56,23 @@ export interface UserProfileUpdateRequest {
     dateOfBirth?: string; // "YYYY-MM-DD"
     businessDescription?: string;
 }
+
+// -----------------------------
+// Friends
+// -----------------------------
+
+export type FriendStatus = "PENDING" | "ACCEPTED" | "BLOCKED";
+
+// Khớp FriendResponse backend
+export interface FriendResponseDto {
+    id: string;
+    user: UserProfile;
+    friend: UserProfile;
+    status: FriendStatus;
+    createdAt: string;
+}
+
+export interface SendFriendRequestPayload {
+    friendId: string;
+}
+
