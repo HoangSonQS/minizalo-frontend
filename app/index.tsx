@@ -1,7 +1,18 @@
-import { Platform } from "react-native";
 import { Redirect } from "expo-router";
+import { useAuthStore } from "@/shared/store/authStore";
 
+/**
+ * Trang gốc "/": chưa hydrate hoặc chưa đăng nhập → login;
+ * đã đăng nhập → (tabs). Đảm bảo mở web luôn đi đúng trang.
+ */
 export default function Index() {
-    // Redirect to login screen
+    const { accessToken, isHydrated } = useAuthStore();
+
+    if (!isHydrated) {
+        return <Redirect href="/(auth)/login" />;
+    }
+    if (accessToken) {
+        return <Redirect href="/(tabs)" />;
+    }
     return <Redirect href="/(auth)/login" />;
 }
