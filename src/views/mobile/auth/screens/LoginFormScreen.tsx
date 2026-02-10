@@ -23,9 +23,6 @@ export default function LoginFormScreen() {
 
     const handleLogin = async () => {
         if (!phone.trim()) {
-
-            Alert.alert("Lỗi", "Vui lòng nhập số điện thoại");
-
             showError("Lỗi", "Vui lòng nhập số điện thoại hoặc email");
             return;
         }
