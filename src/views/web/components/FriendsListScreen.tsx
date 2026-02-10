@@ -467,6 +467,36 @@ export default function FriendsListScreen({
                 zIndex: 50,
               }}
             >
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategoryId("all");
+                  setCategoryMenuOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  border: "none",
+                  backgroundColor: "transparent",
+                  cursor: "pointer",
+                  textAlign: "left" as const,
+                  fontSize: 14,
+                  color: "#111827",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f9fafb";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                {/* Không cần ô màu, hoặc dùng màu xám nhạt */}
+                <span style={{ flex: 1 }}>Tất cả</span>
+              </button>
+
               {categories.map((c) => (
                 <button
                   key={c.id}

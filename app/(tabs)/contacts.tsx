@@ -97,21 +97,21 @@ export default function ContactsScreen() {
           <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {[
               { id: "friends" as const, label: "Danh sách bạn bè", icon: "👥" },
-              {
-                id: "groups" as const,
-                label: "Danh sách nhóm và cộng đồng",
-                icon: "👥",
-              },
+              // {
+              //   id: "groups" as const,
+              //   label: "Danh sách nhóm và cộng đồng",
+              //   icon: "👥",
+              // },
               {
                 id: "friendRequests" as const,
                 label: "Lời mời kết bạn",
                 icon: "💌",
               },
-              {
-                id: "groupInvites" as const,
-                label: "Lời mời vào nhóm và cộng đồng",
-                icon: "📩",
-              },
+              // {
+              //   id: "groupInvites" as const,
+              //   label: "Lời mời vào nhóm và cộng đồng",
+              //   icon: "📩",
+              // },
             ].map((item) => {
               const active = activeNav === item.id;
               return (
