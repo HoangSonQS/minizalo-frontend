@@ -2,10 +2,12 @@ import axios from "axios";
 import { useAuthStore } from "@/shared/store/authStore";
 import type { UserProfile, UserProfileUpdateRequest } from "./types";
 
-const API_BASE_URL =
+// Chuẩn hóa base URL giống authService: luôn có /api (backend phục vụ /api/users/me, ...)
+const rawBase =
     typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL
         ? process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, "")
         : "http://localhost:8080/api";
+const API_BASE_URL = rawBase.endsWith("/api") ? rawBase : `${rawBase}/api`;
 
 function getAuthHeaders() {
     const token = useAuthStore.getState().accessToken;

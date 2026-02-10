@@ -27,6 +27,11 @@ export default function TabsIndex() {
             <Text style={styles.title}>
                 MiniZalo - Tabs Screen
             </Text>
+            {!isWeb && (
+                <Text style={{ marginTop: 8, color: "#666", fontSize: 14 }}>
+                    Danh sách tin nhắn - đang phát triển
+                </Text>
+            )}
         </View>
     );
 }
