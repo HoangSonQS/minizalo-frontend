@@ -1,4 +1,5 @@
 import { View, Text, Platform } from "react-native";
+import ChatListScreen from "@/views/mobile/chat/screens/ChatListScreen";
 
 const styles = {
     container: {
@@ -14,11 +15,16 @@ const styles = {
     },
 };
 
-export default function TabsLayout() {
+export default function TabsIndex() {
     const isWeb = Platform.OS === "web";
+
+    if (!isWeb) {
+        return <ChatListScreen />;
+    }
+
     return (
-        <View style={isWeb ? styles.container : undefined} className={isWeb ? undefined : "flex-1 items-center justify-center bg-zalo-background"}>
-            <Text style={isWeb ? styles.title : undefined} className={isWeb ? undefined : "text-2xl font-bold text-zalo-blue-primary"}>
+        <View style={styles.container}>
+            <Text style={styles.title}>
                 MiniZalo - Tabs Screen
             </Text>
         </View>
