@@ -5,13 +5,16 @@ import type { FriendResponseDto } from "@/shared/services/types";
 type FriendState = {
     friends: FriendResponseDto[];
     requests: FriendResponseDto[];
+    sentRequests: FriendResponseDto[];
     loading: boolean;
     error: string | null;
     fetchFriends: () => Promise<void>;
     fetchRequests: () => Promise<void>;
+    fetchSentRequests: () => Promise<void>;
     sendRequest: (friendId: string) => Promise<void>;
     acceptRequest: (requestId: string) => Promise<void>;
     rejectRequest: (requestId: string) => Promise<void>;
+    cancelSentRequest: (requestId: string) => Promise<void>;
     removeFriend: (friendId: string) => Promise<void>;
     clearError: () => void;
 };
@@ -28,6 +31,7 @@ function extractErrorMessage(e: unknown, fallback: string): string {
 export const useFriendStore = create<FriendState>((set, get) => ({
     friends: [],
     requests: [],
+    sentRequests: [],
     loading: false,
     error: null,
 
@@ -53,6 +57,19 @@ export const useFriendStore = create<FriendState>((set, get) => ({
             set({
                 loading: false,
                 error: extractErrorMessage(e, "Không tải được lời mời kết bạn."),
+            });
+        }
+    },
+
+    fetchSentRequests: async () => {
+        set({ loading: true, error: null });
+        try {
+            const sentRequests = await friendService.getSentRequests();
+            set({ sentRequests, loading: false });
+        } catch (e: unknown) {
+            set({
+                loading: false,
+                error: extractErrorMessage(e, "Không tải được các lời mời đã gửi."),
             });
         }
     },
@@ -98,6 +115,21 @@ export const useFriendStore = create<FriendState>((set, get) => ({
         } catch (e: unknown) {
             set({
                 error: extractErrorMessage(e, "Từ chối lời mời kết bạn thất bại."),
+            });
+            throw e;
+        }
+    },
+
+    cancelSentRequest: async (requestId: string) => {
+        set({ error: null });
+        try {
+            await friendService.cancelSentRequest(requestId);
+            set({
+                sentRequests: get().sentRequests.filter((r) => r.id !== requestId),
+            });
+        } catch (e: unknown) {
+            set({
+                error: extractErrorMessage(e, "Hủy lời mời kết bạn thất bại."),
             });
             throw e;
         }

@@ -95,6 +95,20 @@ export const friendService = {
         return data;
     },
 
+    async getSentRequests(): Promise<FriendResponseDto[]> {
+        const { data } = await api.get<FriendResponseDto[]>("/friends/requests/sent", {
+            headers: getAuthHeaders(),
+        });
+        return data;
+    },
+
+    async cancelSentRequest(requestId: string): Promise<MessageResponse> {
+        const { data } = await api.delete<MessageResponse>(`/friends/request/${requestId}`, {
+            headers: getAuthHeaders(),
+        });
+        return data;
+    },
+
     async blockUser(userId: string): Promise<MessageResponse> {
         const { data } = await api.post<MessageResponse>(
             `/friends/block/${userId}`,
@@ -109,6 +123,13 @@ export const friendService = {
             `/friends/block/${userId}`,
             { headers: getAuthHeaders() }
         );
+        return data;
+    },
+
+    async getBlockedUsers(): Promise<FriendResponseDto[]> {
+        const { data } = await api.get<FriendResponseDto[]>("/friends/blocked", {
+            headers: getAuthHeaders(),
+        });
         return data;
     },
 };

@@ -64,6 +64,7 @@ export default function ProfileScreen({ user }: ProfileScreenProps) {
     const displayName =
         (user?.displayName?.trim() || user?.username?.trim() || "").trim() || "Người dùng";
     const avatarUrl = user?.avatarUrl ?? null;
+    const avatarInitial = displayName.charAt(0).toUpperCase() || "U";
 
     return (
         <SafeAreaView style={profileStyles.container} edges={["top"]}>
@@ -102,7 +103,25 @@ export default function ProfileScreen({ user }: ProfileScreenProps) {
                             style={profileStyles.avatar}
                         />
                     ) : (
-                        <View style={profileStyles.avatar} />
+                        <View
+                            style={[
+                                profileStyles.avatar,
+                                {
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                },
+                            ]}
+                        >
+                            <Text
+                                style={{
+                                    color: PROFILE_COLORS.text,
+                                    fontSize: 28,
+                                    fontWeight: "600",
+                                }}
+                            >
+                                {avatarInitial}
+                            </Text>
+                        </View>
                     )}
                     <View style={profileStyles.avatarBadge}>
                         <Ionicons name="add" size={18} color={PROFILE_COLORS.text} />
