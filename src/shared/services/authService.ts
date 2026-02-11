@@ -57,16 +57,6 @@ export const authService = {
         );
         return response.data;
     },
-
-    updateFcmToken: async (token: string, accessToken: string): Promise<void> => {
-        if (__DEV__) console.log("[authService] updateFcmToken:", token);
-        await api.put(authPath("users/fcm-token"), token, {
-            headers: {
-                "Content-Type": "text/plain",
-                Authorization: `Bearer ${accessToken}`,
-            }
-        });
-    },
 };
 
 export default authService;

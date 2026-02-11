@@ -24,6 +24,9 @@ export default function LoginFormScreen() {
 
     const handleLogin = async () => {
         if (!phone.trim()) {
+
+            Alert.alert("Lỗi", "Vui lòng nhập số điện thoại");
+
             showError("Lỗi", "Vui lòng nhập số điện thoại hoặc email");
             return;
         }
@@ -40,23 +43,6 @@ export default function LoginFormScreen() {
             });
             // Tải profile ngay sau đăng nhập để màn Cá nhân hiển thị đúng tên/avatar
             await useUserStore.getState().fetchProfile();
-
-            // Register for push notifications and update FCM token
-            try {
-                // Dynamic import to avoid issues if packages are missing/web
-                const { registerForPushNotificationsAsync } = require("@/services/notificationService");
-                const token = await registerForPushNotificationsAsync();
-                if (token) {
-                    const { authService } = require("@/shared/services/authService");
-                    const accessToken = useAuthStore.getState().accessToken;
-                    if (accessToken) {
-                        await authService.updateFcmToken(token, accessToken);
-                    }
-                }
-            } catch (error) {
-                console.log("Error registering push token:", error);
-            }
-
             router.replace("/(tabs)");
         } catch (error: any) {
             const serverMessage = error.response?.data?.message;

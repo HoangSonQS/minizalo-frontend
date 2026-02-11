@@ -32,35 +32,18 @@ export const AuthTitle: React.FC<AuthTitleProps> = ({ title }) => (
 // Input field
 interface AuthInputProps extends TextInputProps {
     disabled?: boolean;
-    isPassword?: boolean;
 }
 
-import { Ionicons } from "@expo/vector-icons";
-
-export const AuthInput: React.FC<AuthInputProps> = ({ disabled, isPassword, ...props }) => {
-    const [isVisible, setIsVisible] = React.useState(false);
-
-    return (
-        <View style={authStyles.inputContainer}>
-            <TextInput
-                style={authStyles.input}
-                placeholderTextColor={COLORS.placeholder}
-                editable={!disabled}
-                secureTextEntry={isPassword && !isVisible}
-                {...props}
-            />
-            {isPassword && (
-                <TouchableOpacity onPress={() => setIsVisible(!isVisible)} style={authStyles.eyeIcon}>
-                    <Ionicons
-                        name={isVisible ? "eye-off-outline" : "eye-outline"}
-                        size={24}
-                        color={COLORS.placeholder}
-                    />
-                </TouchableOpacity>
-            )}
-        </View>
-    );
-};
+export const AuthInput: React.FC<AuthInputProps> = ({ disabled, ...props }) => (
+    <View style={authStyles.inputContainer}>
+        <TextInput
+            style={authStyles.input}
+            placeholderTextColor={COLORS.placeholder}
+            editable={!disabled}
+            {...props}
+        />
+    </View>
+);
 
 // Submit button
 interface AuthButtonProps {
