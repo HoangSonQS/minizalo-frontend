@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -24,14 +24,12 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
     const [results, setResults] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { sendRequest, friends } = useFriendStore();
+    const { sendRequest, friends, sentRequests } = useFriendStore();
     const { profile } = useUserStore();
-
-    const [requestedIds, setRequestedIds] = useState<string[]>([]);
 
     const currentUserId = profile?.id ?? null;
 
-    const friendIdSet = React.useMemo(() => {
+    const friendIdSet = useMemo(() => {
         const set = new Set<string>();
         if (!currentUserId) return set;
         friends.forEach((f) => {
@@ -43,6 +41,19 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
         });
         return set;
     }, [friends, currentUserId]);
+
+    // Tập userId mà mình đang gửi lời mời (PENDING) dựa trên sentRequests trong store
+    const pendingRequestIdSet = useMemo(() => {
+        const set = new Set<string>();
+        if (!currentUserId) return set;
+        sentRequests.forEach((fr) => {
+            // Với lời mời mình gửi: user = currentUser, friend = người nhận
+            if (fr.user.id === currentUserId) {
+                set.add(fr.friend.id);
+            }
+        });
+        return set;
+    }, [sentRequests, currentUserId]);
 
     const runSearch = async (value: string) => {
         const q = value.trim();
@@ -75,12 +86,10 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
     };
 
     const handleSendRequest = async (userId: string) => {
-        if (requestedIds.includes(userId) || friendIdSet.has(userId)) return;
+        // Đã là bạn hoặc đã có lời mời đang chờ thì không gửi thêm
+        if (friendIdSet.has(userId) || pendingRequestIdSet.has(userId)) return;
         try {
             await sendRequest(userId);
-            setRequestedIds((prev) =>
-                prev.includes(userId) ? prev : [...prev, userId]
-            );
             Alert.alert("Thành công", "Đã gửi lời mời kết bạn.");
         } catch {
             Alert.alert("Lỗi", "Gửi lời mời kết bạn thất bại.");
@@ -100,8 +109,8 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
         const initial =
             (displayName.charAt(0).toUpperCase() || "?").toUpperCase();
         const isSelf = currentUserId === item.id;
-        const isRequested = requestedIds.includes(item.id);
         const alreadyFriend = friendIdSet.has(item.id);
+        const isRequested = pendingRequestIdSet.has(item.id);
         const disabled = isSelf || isRequested || alreadyFriend;
         const label = isSelf
             ? ""

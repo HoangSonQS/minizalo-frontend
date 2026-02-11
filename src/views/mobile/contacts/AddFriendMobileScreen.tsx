@@ -1,13 +1,22 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { PROFILE_COLORS } from "../profile/styles";
 import SearchUsersMobile from "./SearchUsersMobile";
 
 export default function AddFriendMobileScreen() {
     const router = useRouter();
+    const [searchInstanceKey, setSearchInstanceKey] = useState(0);
+
+    // Mỗi lần màn Thêm bạn được focus, tăng key để reset trạng thái tìm kiếm cũ
+    useFocusEffect(
+        useCallback(() => {
+            setSearchInstanceKey((prev) => prev + 1);
+        }, [])
+    );
 
     return (
         <SafeAreaView
@@ -47,8 +56,9 @@ export default function AddFriendMobileScreen() {
                 </Text>
             </View>
 
-            {/* Nội dung: tái sử dụng màn tìm kiếm người dùng, không có QR / gợi ý */}
-            <SearchUsersMobile />
+            {/* Nội dung: tái sử dụng màn tìm kiếm người dùng, không có QR / gợi ý.
+                Dùng key để reset state mỗi lần vào lại màn này. */}
+            <SearchUsersMobile key={searchInstanceKey} />
         </SafeAreaView>
     );
 }
