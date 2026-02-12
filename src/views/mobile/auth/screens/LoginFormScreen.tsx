@@ -14,6 +14,10 @@ export default function LoginFormScreen() {
     const [loading, setLoading] = useState(false);
     const [errorModal, setErrorModal] = useState({ visible: false, title: "", message: "" });
 
+    // Validation hooks
+    const [phoneError, setPhoneError] = useState("");
+    const [passwordError, setPasswordError] = useState("");
+
     const showError = (title: string, message: string) => {
         setErrorModal({ visible: true, title, message });
     };
@@ -23,17 +27,22 @@ export default function LoginFormScreen() {
     };
 
     const handleLogin = async () => {
+        // Reset errors
+        setPhoneError("");
+        setPasswordError("");
+
+        let isValid = true;
+
         if (!phone.trim()) {
-
-            Alert.alert("Lỗi", "Vui lòng nhập số điện thoại");
-
-            showError("Lỗi", "Vui lòng nhập số điện thoại hoặc email");
-            return;
+            setPhoneError("Vui lòng nhập số điện thoại hoặc email");
+            isValid = false;
         }
         if (!password) {
-            showError("Lỗi", "Vui lòng nhập mật khẩu");
-            return;
+            setPasswordError("Vui lòng nhập mật khẩu");
+            isValid = false;
         }
+
+        if (!isValid) return;
 
         setLoading(true);
         try {
@@ -65,7 +74,11 @@ export default function LoginFormScreen() {
                 message = "Lỗi kết nối mạng. Vui lòng kiểm tra internet.";
             }
 
-            showError("Đăng nhập thất bại", message);
+            // Set error for both fields to indicate login failure visually
+            setPhoneError(" ");
+            setPasswordError(message);
+            // Also show modal for clarity if needed, or just rely on inline error
+            // keeping modal for detailed message if it's long, or just setting passwordError
         } finally {
             setLoading(false);
         }
@@ -86,17 +99,19 @@ export default function LoginFormScreen() {
                 <AuthInput
                     placeholder="Số điện thoại hoặc email"
                     value={phone}
-                    onChangeText={setPhone}
+                    onChangeText={(text) => { setPhone(text); setPhoneError(""); }}
                     keyboardType="phone-pad"
                     disabled={loading}
+                    error={phoneError}
                 />
 
                 <AuthInput
                     placeholder="Mật khẩu"
                     value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
+                    onChangeText={(text) => { setPassword(text); setPasswordError(""); }}
+                    isPassword
                     disabled={loading}
+                    error={passwordError}
                 />
 
                 <AuthButton
