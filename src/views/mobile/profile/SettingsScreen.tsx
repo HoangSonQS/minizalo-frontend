@@ -21,12 +21,11 @@ const headerStyles = {
         fontWeight: "600" as const,
         color: PROFILE_COLORS.text,
     },
-    logoutRow: {
+    row: {
         flexDirection: "row" as const,
         alignItems: "center" as const,
         paddingHorizontal: 16,
         paddingVertical: 16,
-        marginTop: 24,
         backgroundColor: PROFILE_COLORS.card,
         marginHorizontal: 16,
         borderRadius: 12,
@@ -36,6 +35,11 @@ const headerStyles = {
         fontSize: 16,
         fontWeight: "500" as const,
         color: "#ff3b30",
+    },
+    rowText: {
+        fontSize: 16,
+        fontWeight: "500" as const,
+        color: PROFILE_COLORS.text,
     },
 };
 
@@ -75,8 +79,23 @@ export default function SettingsScreen() {
                 <Text style={headerStyles.title}>Cài đặt</Text>
             </View>
 
+            {/* Danh sách chặn */}
             <TouchableOpacity
-                style={headerStyles.logoutRow}
+                style={[headerStyles.row, { marginTop: 24 }]}
+                onPress={() => router.push("/(tabs)/blocked")}
+                activeOpacity={0.7}
+            >
+                <Ionicons
+                    name="ban-outline"
+                    size={24}
+                    color={PROFILE_COLORS.textSecondary}
+                />
+                <Text style={headerStyles.rowText}>Danh sách chặn</Text>
+            </TouchableOpacity>
+
+            {/* Đăng xuất */}
+            <TouchableOpacity
+                style={[headerStyles.row, { marginTop: 16 }]}
                 onPress={handleLogout}
                 activeOpacity={0.7}
             >

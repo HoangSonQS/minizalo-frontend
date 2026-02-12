@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert } from "react-native";
+import { View, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert, TouchableOpacity, Text } from "react-native";
 import { useRouter } from "expo-router";
 import authService from "@/shared/services/authService";
 import { authStyles } from "../styles";
@@ -14,40 +14,60 @@ export default function RegisterFormScreen() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
 
+    // Validation error states
+    const [nameError, setNameError] = useState("");
+    const [phoneError, setPhoneError] = useState("");
+    const [emailError, setEmailError] = useState("");
+    const [passwordError, setPasswordError] = useState("");
+    const [confirmPasswordError, setConfirmPasswordError] = useState("");
+
     const handleRegister = async () => {
+        // Reset errors
+        setNameError("");
+        setPhoneError("");
+        setEmailError("");
+        setPasswordError("");
+        setConfirmPasswordError("");
+
+        let isValid = true;
+
         // Validation
         if (!name.trim()) {
-            Alert.alert("Lỗi", "Vui lòng nhập tên");
-            return;
+            setNameError("Vui lòng nhập tên");
+            isValid = false;
         }
         if (!phone.trim()) {
-            Alert.alert("Lỗi", "Vui lòng nhập số điện thoại");
-            return;
-        }
-        if (!/^[0-9]{10,11}$/.test(phone)) {
-            Alert.alert("Lỗi", "Số điện thoại phải có 10-11 chữ số");
-            return;
+            setPhoneError("Vui lòng nhập số điện thoại");
+            isValid = false;
+        } else if (!/^[0-9]{10,11}$/.test(phone)) {
+            setPhoneError("Số điện thoại phải có 10-11 chữ số");
+            isValid = false;
         }
         if (!email.trim()) {
-            Alert.alert("Lỗi", "Vui lòng nhập email");
-            return;
-        }
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            Alert.alert("Lỗi", "Email không hợp lệ");
-            return;
+            setEmailError("Vui lòng nhập email");
+            isValid = false;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            setEmailError("Email không hợp lệ");
+            isValid = false;
         }
         if (!password) {
-            Alert.alert("Lỗi", "Vui lòng nhập mật khẩu");
-            return;
+            setPasswordError("Vui lòng nhập mật khẩu");
+            isValid = false;
+        } else if (password.length < 6) {
+            setPasswordError("Mật khẩu phải có ít nhất 6 ký tự");
+            isValid = false;
+        } else if (!/^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{6,}$/.test(password)) {
+            // Check complexity
+            setPasswordError("Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, số và ký tự đặc biệt (!@#$%^&*)");
+            isValid = false;
         }
-        if (password.length < 6) {
-            Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự");
-            return;
-        }
+
         if (password !== confirmPassword) {
-            Alert.alert("Lỗi", "Mật khẩu nhập lại không khớp");
-            return;
+            setConfirmPasswordError("Mật khẩu nhập lại không khớp");
+            isValid = false;
         }
+
+        if (!isValid) return;
 
         setLoading(true);
         try {
@@ -61,9 +81,17 @@ export default function RegisterFormScreen() {
                 { text: "OK", onPress: () => router.replace("/(auth)/login-form") },
             ]);
         } catch (error: any) {
-            console.error("Register error:", error);
             const message = error.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
-            Alert.alert("Lỗi", message);
+            const messageLower = message.toLowerCase();
+
+            // Handle duplicate errors specifically if possible
+            if (messageLower.includes("phone") || messageLower.includes("số điện thoại") || messageLower.includes("already registed") || messageLower.includes("already registered")) {
+                setPhoneError("Số điện thoại này đã được sử dụng.");
+            } else if (messageLower.includes("email")) {
+                setEmailError("Email này đã được sử dụng.");
+            } else {
+                Alert.alert("Lỗi", message);
+            }
         } finally {
             setLoading(false);
         }
@@ -85,42 +113,48 @@ export default function RegisterFormScreen() {
                     <AuthInput
                         placeholder="Tên"
                         value={name}
-                        onChangeText={setName}
+                        onChangeText={(text) => { setName(text); setNameError(""); }}
                         disabled={loading}
+                        error={nameError}
                     />
 
                     <AuthInput
                         placeholder="Số điện thoại"
                         value={phone}
-                        onChangeText={setPhone}
+                        onChangeText={(text) => { setPhone(text); setPhoneError(""); }}
                         keyboardType="phone-pad"
                         disabled={loading}
+                        error={phoneError}
                     />
 
                     <AuthInput
                         placeholder="Email"
                         value={email}
-                        onChangeText={setEmail}
+                        onChangeText={(text) => { setEmail(text); setEmailError(""); }}
                         keyboardType="email-address"
                         autoCapitalize="none"
                         disabled={loading}
+                        error={emailError}
                     />
 
                     <AuthInput
                         placeholder="Mật khẩu"
                         value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
+                        onChangeText={(text) => { setPassword(text); setPasswordError(""); }}
+                        isPassword
                         disabled={loading}
+                        error={passwordError}
                     />
 
                     <AuthInput
                         placeholder="Nhập lại mật khẩu"
                         value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        secureTextEntry
+                        onChangeText={(text) => { setConfirmPassword(text); setConfirmPasswordError(""); }}
+                        isPassword
                         disabled={loading}
+                        error={confirmPasswordError}
                     />
+
 
                     <AuthButton
                         title="Đăng ký"

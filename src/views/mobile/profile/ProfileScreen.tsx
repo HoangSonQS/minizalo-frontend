@@ -64,6 +64,7 @@ export default function ProfileScreen({ user }: ProfileScreenProps) {
     const displayName =
         (user?.displayName?.trim() || user?.username?.trim() || "").trim() || "Người dùng";
     const avatarUrl = user?.avatarUrl ?? null;
+    const avatarInitial = displayName.charAt(0).toUpperCase() || "U";
 
     return (
         <SafeAreaView style={profileStyles.container} edges={["top"]}>
@@ -79,7 +80,25 @@ export default function ProfileScreen({ user }: ProfileScreenProps) {
                         placeholderTextColor={PROFILE_COLORS.textSecondary}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
+                        showSoftInputOnFocus={false}
+                        onFocus={() => {
+                            router.push("/(tabs)/contacts-search");
+                            setSearchQuery("");
+                        }}
                     />
+                    {searchQuery ? (
+                        <TouchableOpacity
+                            onPress={() => setSearchQuery("")}
+                            style={{ paddingLeft: 4 }}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name="close-circle"
+                                size={18}
+                                color={PROFILE_COLORS.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
                 <TouchableOpacity
                     style={profileStyles.settingsButton}
@@ -102,7 +121,25 @@ export default function ProfileScreen({ user }: ProfileScreenProps) {
                             style={profileStyles.avatar}
                         />
                     ) : (
-                        <View style={profileStyles.avatar} />
+                        <View
+                            style={[
+                                profileStyles.avatar,
+                                {
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                },
+                            ]}
+                        >
+                            <Text
+                                style={{
+                                    color: PROFILE_COLORS.text,
+                                    fontSize: 28,
+                                    fontWeight: "600",
+                                }}
+                            >
+                                {avatarInitial}
+                            </Text>
+                        </View>
                     )}
                     <View style={profileStyles.avatarBadge}>
                         <Ionicons name="add" size={18} color={PROFILE_COLORS.text} />

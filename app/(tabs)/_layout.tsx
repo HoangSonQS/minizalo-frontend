@@ -50,6 +50,8 @@ export default function TabsLayout() {
                     tabBarInactiveTintColor: "#8e8e93",
                     tabBarStyle: { backgroundColor: "#0d0d0d", borderTopColor: "#2a2a2a" },
                     tabBarLabelStyle: { fontSize: 11 },
+                    // Khi bàn phím ảo mở, ẩn thanh tab để tránh bị "đẩy" lên
+                    tabBarHideOnKeyboard: true,
                 }}
             >
                 <Tabs.Screen
@@ -70,6 +72,7 @@ export default function TabsLayout() {
                         ),
                     }}
                 />
+                <Tabs.Screen name="contacts-search" options={{ href: null }} />
                 <Tabs.Screen
                     name="explore"
                     options={{
@@ -97,6 +100,11 @@ export default function TabsLayout() {
                         ),
                     }}
                 />
+                {/* Các màn phụ không xuất hiện trên thanh tab */}
+                <Tabs.Screen name="contacts-add" options={{ href: null }} />
+                <Tabs.Screen name="contacts-requests" options={{ href: null }} />
+                <Tabs.Screen name="contacts-birthdays" options={{ href: null }} />
+                <Tabs.Screen name="blocked" options={{ href: null }} />
                 <Tabs.Screen name="account-edit" options={{ href: null }} />
                 <Tabs.Screen name="settings" options={{ href: null }} />
                 <Tabs.Screen name="data" options={{ href: null }} />

@@ -52,11 +52,17 @@ export const authStyles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
         marginBottom: 16,
+        flexDirection: "row",
+        alignItems: "center",
     },
     input: {
+        flex: 1,
         paddingVertical: 12,
         fontSize: 16,
         color: COLORS.text,
+    },
+    eyeIcon: {
+        padding: 8,
     },
     submitButton: {
         backgroundColor: COLORS.primary,

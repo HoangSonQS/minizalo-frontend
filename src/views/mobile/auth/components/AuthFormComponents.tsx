@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, TextInputProps } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { authStyles, COLORS } from "../styles";
 
 // Header với nút back
@@ -32,18 +33,48 @@ export const AuthTitle: React.FC<AuthTitleProps> = ({ title }) => (
 // Input field
 interface AuthInputProps extends TextInputProps {
     disabled?: boolean;
+    error?: string; // Error message or boolean to trigger red border
+    isPassword?: boolean; // Flag to enable password toggle
 }
 
-export const AuthInput: React.FC<AuthInputProps> = ({ disabled, ...props }) => (
-    <View style={authStyles.inputContainer}>
-        <TextInput
-            style={authStyles.input}
-            placeholderTextColor={COLORS.placeholder}
-            editable={!disabled}
-            {...props}
-        />
-    </View>
-);
+export const AuthInput: React.FC<AuthInputProps> = ({ disabled, error, isPassword, ...props }) => {
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+    // Determine if we should secure text entry
+    // Only secure if it IS a password field AND not visible
+    const secureTextEntry = isPassword && !isPasswordVisible;
+
+    return (
+        <View style={{ marginBottom: 16 }}>
+            <View style={[
+                authStyles.inputContainer,
+                { marginBottom: 0 }, // We handle margin in the wrapper View
+                error ? { borderBottomColor: 'red' } : {}
+            ]}>
+                <TextInput
+                    style={authStyles.input}
+                    placeholderTextColor={COLORS.placeholder}
+                    editable={!disabled}
+                    secureTextEntry={secureTextEntry}
+                    {...props}
+                />
+                {isPassword && (
+                    <TouchableOpacity
+                        onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                        style={{ padding: 8 }}
+                    >
+                        <Ionicons
+                            name={isPasswordVisible ? "eye-off" : "eye"}
+                            size={24}
+                            color="gray"
+                        />
+                    </TouchableOpacity>
+                )}
+            </View>
+            {error && <Text style={{ color: 'red', fontSize: 12, marginTop: 4, marginLeft: 0 }}>{error}</Text>}
+        </View>
+    );
+};
 
 // Submit button
 interface AuthButtonProps {

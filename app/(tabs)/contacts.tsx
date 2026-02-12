@@ -4,6 +4,7 @@ import { useUserStore } from "@/shared/store/userStore";
 import FriendsListScreen from "@/views/web/components/FriendsListScreen";
 import FriendRequestsScreen from "@/views/web/components/FriendRequestsScreen";
 import SearchUsersScreen from "@/views/web/components/SearchUsersScreen";
+import ContactsMobileScreen from "@/views/mobile/contacts/ContactsMobileScreen";
 
 export default function ContactsScreen() {
   const isWeb = Platform.OS === "web";
@@ -202,16 +203,6 @@ export default function ContactsScreen() {
     );
   }
 
-  // Bản mobile: giữ placeholder đơn giản, sau có thể tái dùng shared store để hiển thị.
-  return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#f2f4f7", padding: 16 }}>
-      <Text style={{ fontSize: 24, fontWeight: "bold", color: "#0068FF" }}>
-        Danh bạ
-      </Text>
-      <Text style={{ marginTop: 8, color: "#666" }}>
-        Màn hình danh bạ cho mobile sẽ được hoàn thiện sau, hiện chức năng đầy
-        đủ đã có trên bản web.
-      </Text>
-    </ScrollView>
-  );
+  // Bản mobile: dùng ContactsMobileScreen với UI & chức năng đầy đủ
+  return <ContactsMobileScreen />;
 }

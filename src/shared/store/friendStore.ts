@@ -5,13 +5,16 @@ import type { FriendResponseDto } from "@/shared/services/types";
 type FriendState = {
     friends: FriendResponseDto[];
     requests: FriendResponseDto[];
+    sentRequests: FriendResponseDto[];
     loading: boolean;
     error: string | null;
     fetchFriends: () => Promise<void>;
     fetchRequests: () => Promise<void>;
+    fetchSentRequests: () => Promise<void>;
     sendRequest: (friendId: string) => Promise<void>;
     acceptRequest: (requestId: string) => Promise<void>;
     rejectRequest: (requestId: string) => Promise<void>;
+    cancelSentRequest: (requestId: string) => Promise<void>;
     removeFriend: (friendId: string) => Promise<void>;
     clearError: () => void;
 };
@@ -28,6 +31,7 @@ function extractErrorMessage(e: unknown, fallback: string): string {
 export const useFriendStore = create<FriendState>((set, get) => ({
     friends: [],
     requests: [],
+    sentRequests: [],
     loading: false,
     error: null,
 
@@ -57,13 +61,29 @@ export const useFriendStore = create<FriendState>((set, get) => ({
         }
     },
 
+    fetchSentRequests: async () => {
+        set({ loading: true, error: null });
+        try {
+            const sentRequests = await friendService.getSentRequests();
+            set({ sentRequests, loading: false });
+        } catch (e: unknown) {
+            set({
+                loading: false,
+                error: extractErrorMessage(e, "Không tải được các lời mời đã gửi."),
+            });
+        }
+    },
+
     sendRequest: async (friendId: string) => {
         set({ error: null });
         try {
-            // Gửi lời mời: phía người gửi không cần thêm vào danh sách
-            // "Lời mời kết bạn" (danh sách đó dành cho các yêu cầu NHẬN được).
-            // Người nhận khi đăng nhập sẽ thấy request qua API /friends/requests.
-            await friendService.sendFriendRequest({ friendId });
+            // Gửi lời mời: backend trả về FriendResponseDto (request PENDING).
+            // Lưu lại vào sentRequests để các màn hình khác (Thêm bạn, Lời mời đã gửi...)
+            // có thể hiển thị trạng thái "Đã gửi" và cho phép hủy.
+            const created = await friendService.sendFriendRequest({ friendId });
+            set({
+                sentRequests: [...get().sentRequests, created],
+            });
         } catch (e: unknown) {
             set({
                 error: extractErrorMessage(e, "Gửi lời mời kết bạn thất bại."),
@@ -98,6 +118,21 @@ export const useFriendStore = create<FriendState>((set, get) => ({
         } catch (e: unknown) {
             set({
                 error: extractErrorMessage(e, "Từ chối lời mời kết bạn thất bại."),
+            });
+            throw e;
+        }
+    },
+
+    cancelSentRequest: async (requestId: string) => {
+        set({ error: null });
+        try {
+            await friendService.cancelSentRequest(requestId);
+            set({
+                sentRequests: get().sentRequests.filter((r) => r.id !== requestId),
+            });
+        } catch (e: unknown) {
+            set({
+                error: extractErrorMessage(e, "Hủy lời mời kết bạn thất bại."),
             });
             throw e;
         }
