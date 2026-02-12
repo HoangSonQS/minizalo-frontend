@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { PROFILE_COLORS } from "../profile/styles";
 import { searchService } from "@/shared/services/searchService";
@@ -17,9 +18,13 @@ import type { UserProfile } from "@/shared/services/types";
 
 type SearchUsersMobileProps = {
     initialQuery?: string;
+    autoFocus?: boolean;
 };
 
-export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobileProps) {
+export default function SearchUsersMobile({
+    initialQuery = "",
+    autoFocus = false,
+}: SearchUsersMobileProps) {
     const [query, setQuery] = useState(initialQuery);
     const [results, setResults] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(false);
@@ -28,6 +33,7 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
     const { profile } = useUserStore();
 
     const currentUserId = profile?.id ?? null;
+    const inputRef = useRef<TextInput | null>(null);
 
     const friendIdSet = useMemo(() => {
         const set = new Set<string>();
@@ -96,13 +102,42 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
         }
     };
 
+    // Khi có initialQuery (từ thanh tìm kiếm chính), set lại query để effect bên dưới xử lý
     useEffect(() => {
         if (initialQuery.trim()) {
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            runSearch(initialQuery);
+            setQuery(initialQuery);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialQuery]);
+
+    // Tìm kiếm "theo từng ký tự" với debounce ngắn
+    useEffect(() => {
+        const q = query.trim();
+        if (!q) {
+            setResults([]);
+            setError(null);
+            return;
+        }
+        const timeoutId = setTimeout(() => {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            runSearch(q);
+        }, 350); // debounce ~0.35s
+
+        return () => clearTimeout(timeoutId);
+    }, [query]);
+
+    // Tự focus ô tìm kiếm khi màn này được hiển thị (khi autoFocus = true)
+    useFocusEffect(
+        useCallback(() => {
+            if (autoFocus && inputRef.current) {
+                // nhỏ delay để đảm bảo navigation đã hoàn tất trước khi focus
+                const id = setTimeout(() => {
+                    inputRef.current?.focus();
+                }, 50);
+                return () => clearTimeout(id);
+            }
+            return () => {};
+        }, [autoFocus])
+    );
 
     const renderItem = ({ item }: { item: UserProfile }) => {
         const displayName = item.displayName || item.username || "Người dùng";
@@ -258,6 +293,7 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
                         style={{ marginRight: 6 }}
                     />
                     <TextInput
+                        ref={inputRef}
                         value={query}
                         onChangeText={setQuery}
                         placeholder="Nhập tên, số điện thoại hoặc email..."
@@ -268,9 +304,23 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
                             fontSize: 14,
                             paddingVertical: 0,
                         }}
+                        autoFocus={autoFocus}
                         onSubmitEditing={handleSubmit}
                         returnKeyType="search"
                     />
+                    {query ? (
+                        <TouchableOpacity
+                            onPress={() => setQuery("")}
+                            style={{ paddingLeft: 4 }}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name="close-circle"
+                                size={18}
+                                color={PROFILE_COLORS.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
                 <TouchableOpacity
                     onPress={handleSubmit}

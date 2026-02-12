@@ -136,7 +136,9 @@ export default function ContactsMobileScreen() {
     const renderTabContent = () => {
         switch (activeTab) {
             case "friends":
-                return <FriendsListMobile searchText={searchText} />;
+                // Danh sách bạn bè không bị ảnh hưởng bởi thanh tìm kiếm chính.
+                // Thanh tìm kiếm chỉ dùng để mở màn tìm kiếm riêng (contacts-search).
+                return <FriendsListMobile />;
             case "groups":
                 return (
                     <View
@@ -288,7 +290,27 @@ export default function ContactsMobileScreen() {
                                 fontSize: 14,
                                 paddingVertical: 0,
                             }}
+                            showSoftInputOnFocus={false}
+                            onFocus={() => {
+                                // Mở màn tìm kiếm chung và focus input bên đó
+                                router.push("/(tabs)/contacts-search");
+                                // Xóa text cũ để lần sau vào lại luôn sạch
+                                setSearchText("");
+                            }}
                         />
+                        {searchText ? (
+                            <TouchableOpacity
+                                onPress={() => setSearchText("")}
+                                style={{ paddingLeft: 6 }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons
+                                    name="close-circle"
+                                    size={18}
+                                    color={PROFILE_COLORS.textSecondary}
+                                />
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
                     <TouchableOpacity
                         activeOpacity={0.8}
