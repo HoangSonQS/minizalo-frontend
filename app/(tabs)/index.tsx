@@ -1,31 +1,26 @@
 import { View, Text, Platform } from "react-native";
+import React from "react";
 
-const styles = {
-    container: {
-        flex: 1,
-        alignItems: "center" as const,
-        justifyContent: "center" as const,
-        backgroundColor: "#F2F4F7",
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: "bold" as const,
-        color: "#0068FF",
-    },
-};
+// Lazy load Web component
+const HomeWeb = React.lazy(() => import("@/views/web/home/HomeWeb"));
 
 export default function TabsIndex() {
-    const isWeb = Platform.OS === "web";
+    if (Platform.OS === "web") {
+        return (
+            <React.Suspense fallback={<Text>Loading...</Text>}>
+                <HomeWeb />
+            </React.Suspense>
+        );
+    }
+
     return (
-        <View style={isWeb ? styles.container : undefined} className={isWeb ? undefined : "flex-1 items-center justify-center bg-zalo-background"}>
-            <Text style={isWeb ? styles.title : undefined} className={isWeb ? undefined : "text-2xl font-bold text-zalo-blue-primary"}>
-                {isWeb ? "MiniZalo - Tabs Screen" : "Tin nhắn"}
+        <View className="flex-1 items-center justify-center bg-zalo-background">
+            <Text className="text-2xl font-bold text-zalo-blue-primary">
+                Tin nhắn (Mobile)
             </Text>
-            {!isWeb && (
-                <Text style={{ marginTop: 8, color: "#666", fontSize: 14 }}>
-                    Danh sách tin nhắn - đang phát triển
-                </Text>
-            )}
+            <Text style={{ marginTop: 8, color: "#666", fontSize: 14 }}>
+                Danh sách tin nhắn - đang phát triển
+            </Text>
         </View>
     );
 }
