@@ -9,15 +9,12 @@ console.log('WebSocketService initialized with URL:', WS_URL);
 class WebSocketService {
     private client: Client;
     private connected: boolean = false;
+    private pendingSubscriptions: Record<string, (message: IMessage) => void> = {};
     private subscriptions: Record<string, any> = {};
 
     constructor() {
         this.client = new Client({
             brokerURL: WS_URL,
-            // connectHeaders: {
-            //   login: 'user',
-            //   passcode: 'password',
-            // },
             debug: (str) => {
                 console.log('STOMP: ' + str);
             },
@@ -29,8 +26,18 @@ class WebSocketService {
         this.client.onConnect = (frame) => {
             console.log('Connected to WebSocket');
             this.connected = true;
+            // Process pending subscriptions
+            Object.keys(this.pendingSubscriptions).forEach(dest => {
+                 // Use basic subscribe here to avoid circular logic or re-checking connected
+                 const callback = this.pendingSubscriptions[dest];
+                 const sub = this.client.subscribe(dest, callback);
+                 this.subscriptions[dest] = sub;
+            });
+            this.pendingSubscriptions = {};
         };
-
+        
+        // ... rest of error handlers
+        
         this.client.onStompError = (frame) => {
             console.error('Broker reported error: ' + frame.headers['message']);
             console.error('Additional details: ' + frame.body);
@@ -39,15 +46,21 @@ class WebSocketService {
         this.client.onWebSocketError = (event) => {
             console.error('Error with websocket', event);
         };
-
+        
         this.client.onDisconnect = () => {
             this.connected = false;
             console.log('Disconnected');
+            this.subscriptions = {}; 
         }
     }
 
-    activate() {
+    activate(token?: string) {
         console.log('Activating STOMP client...');
+        if (token) {
+            this.client.connectHeaders = {
+                Authorization: `Bearer ${token}`
+            };
+        }
         this.client.activate();
     }
 
@@ -57,7 +70,8 @@ class WebSocketService {
 
     subscribe(destination: string, callback: (message: IMessage) => void) {
         if (!this.client.connected) {
-            console.warn('STOMP client not connected, cannot subscribe to', destination);
+            console.log('STOMP client not connected, queueing subscription to', destination);
+            this.pendingSubscriptions[destination] = callback;
             return;
         }
         if (this.subscriptions[destination]) {
@@ -73,6 +87,9 @@ class WebSocketService {
             this.subscriptions[destination].unsubscribe();
             delete this.subscriptions[destination];
             console.log('Unsubscribed from ' + destination);
+        }
+        if (this.pendingSubscriptions[destination]) {
+            delete this.pendingSubscriptions[destination];
         }
     }
 

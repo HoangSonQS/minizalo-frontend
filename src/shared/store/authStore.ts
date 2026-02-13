@@ -5,8 +5,10 @@ import type { LoginRequest, JwtResponse } from "@/shared/services/types";
 type AuthState = {
     accessToken: string | null;
     refreshToken: string | null;
+    user: import('./../types').User | null;
     isHydrated: boolean;
     setTokens: (accessToken: string, refreshToken: string) => void;
+    setUser: (user: import('./../types').User) => void;
     login: (data: LoginRequest) => Promise<void>;
     logout: () => Promise<void>;
     refreshAuth: () => Promise<boolean>;
@@ -19,9 +21,12 @@ type AuthState = {
 export const useAuthStore = create<AuthState>()((set, get) => ({
     accessToken: null,
     refreshToken: null,
+    user: null,
     isHydrated: true,
 
     setHydrated: () => set({ isHydrated: true }),
+
+    setUser: (user) => set({ user }),
 
     setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken }),
@@ -43,7 +48,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
                 // ignore network error on logout
             }
         }
-        set({ accessToken: null, refreshToken: null });
+        // Deactivate WebSocket
+        const { webSocketService } = await import('@/shared/services/WebSocketService');
+        webSocketService.deactivate();
+        
+        set({ accessToken: null, refreshToken: null, user: null });
     },
 
     refreshAuth: async (): Promise<boolean> => {
@@ -62,7 +71,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         }
     },
 
-    clear: () => set({ accessToken: null, refreshToken: null }),
+    clear: () => set({ accessToken: null, refreshToken: null, user: null }),
 }));
 
 export const isAuthenticated = (): boolean => {
