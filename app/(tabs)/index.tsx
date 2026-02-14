@@ -1,8 +1,19 @@
-import { Platform } from "react-native";
+import { Platform, Text } from "react-native";
+import React from "react";
 import ChatListScreen from "@/views/mobile/chat/screens/ChatListScreen";
 
+// Lazy load Web component
+const HomeWeb = React.lazy(() => import("@/views/web/home/HomeWeb"));
+
 export default function TabsIndex() {
-    // On mobile, render the ChatListScreen directly
-    // On web, you can add a web-specific layout later
+    if (Platform.OS === "web") {
+        return (
+            <React.Suspense fallback={<Text>Loading...</Text>}>
+                <HomeWeb />
+            </React.Suspense>
+        );
+    }
+
+    // Mobile
     return <ChatListScreen />;
 }

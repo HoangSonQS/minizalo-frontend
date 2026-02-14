@@ -54,6 +54,7 @@ export interface Message {
     fileName?: string;
     fileSize?: number;
     forwardedFromId?: string; // original sender id if forwarded
+    receiverId?: string; // Optional: ID of the receiver for private messages
 }
 
 export interface PaginatedMessageResult {
@@ -66,4 +67,15 @@ export interface SearchMessageResponse {
     results: Message[];
     lastKey?: string;
     total: number;
+}
+
+export interface ChatRoom {
+    id: string;
+    name: string;
+    avatarUrl?: string; // Group avatar or friend avatar
+    type: 'GROUP' | 'PRIVATE';
+    lastMessage?: Message;
+    unreadCount: number;
+    participants: User[];
+    updatedAt: string;
 }
