@@ -18,31 +18,36 @@ export default function ChatListScreen() {
         fetchChats().finally(() => setRefreshing(false));
     }, []);
 
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const hasLoadedOnce = useRef(false);
 
-    const fetchChats = async () => {
+    const fetchChats = async (showLoading = false) => {
         try {
+            if (showLoading && !hasLoadedOnce.current) setLoading(true);
             setError(null);
             const data = await chatService.getChatRooms();
             setChats(data);
+            hasLoadedOnce.current = true;
         } catch (err: any) {
             console.log("Error fetching chats:", err);
             if (chats.length === 0) {
                 setError(err.message || "Failed to fetch chats");
             }
+        } finally {
+            setLoading(false);
         }
     };
 
     // Auto-fetch when screen is focused
     useFocusEffect(
         useCallback(() => {
-            fetchChats();
+            fetchChats(true);
 
-            // Auto-refresh every 10 seconds while focused
+            // Auto-refresh every 30 seconds while focused (background, no loading)
             const interval = setInterval(() => {
-                fetchChats();
-            }, 10000);
+                fetchChats(false);
+            }, 30000);
 
             return () => clearInterval(interval);
         }, [])
