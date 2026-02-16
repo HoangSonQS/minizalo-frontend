@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { View, FlatList, ActivityIndicator, Text, KeyboardAvoidingView, Platform } from "react-native";
+import { View, FlatList, Text, KeyboardAvoidingView, Platform } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import ChatHeader from "../components/ChatHeader";
 import ChatFooter from "../components/ChatFooter";
 import MessageBubble from "../components/MessageBubble";
 import { chatService, MessageDynamo } from "@/shared/services/chatService";
+import { webSocketService } from "@/shared/services/WebSocketService";
 import { useUserStore } from "@/shared/store/userStore";
 import { formatTime } from "@/shared/utils/dateUtils";
 
@@ -15,59 +16,76 @@ export default function ChatScreen() {
     const displayName = typeof name === "string" ? name : "Người dùng";
 
     const [messages, setMessages] = useState<MessageDynamo[]>([]);
-    const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [loaded, setLoaded] = useState(false);
     const flatListRef = useRef<FlatList>(null);
 
     const currentUserId = useUserStore((s) => s.profile?.id);
-    const isFetchingRef = useRef(false);
 
-    // Fetch chat history with timeout protection
+    // ─── Load chat history ───
     const fetchMessages = useCallback(async () => {
-        if (!roomId || isFetchingRef.current) return;
-        isFetchingRef.current = true;
-
+        if (!roomId) return;
         try {
-            // Add 5s timeout to prevent hanging
-            const timeoutPromise = new Promise<null>((_, reject) =>
-                setTimeout(() => reject(new Error("Timeout")), 5000)
-            );
-            const result = await Promise.race([
-                chatService.getChatHistory(roomId),
-                timeoutPromise,
-            ]);
-            if (result?.messages) {
+            const result = await chatService.getChatHistory(roomId);
+            console.log("📜 History result:", result?.messages?.length ?? 0, "messages");
+            if (result?.messages && result.messages.length > 0) {
                 setMessages(result.messages.reverse());
             }
         } catch (err) {
-            console.log("Error/timeout fetching messages:", err);
+            console.log("Error fetching messages:", err);
         } finally {
-            setLoading(false);
-            isFetchingRef.current = false;
+            setLoaded(true);
         }
     }, [roomId]);
 
+    // ─── WebSocket: subscribe to room for realtime ───
     useEffect(() => {
+        if (!roomId) return;
+
+        // Fetch history
         fetchMessages();
 
-        // Poll every 10 seconds (not 5s to avoid request pile-up)
-        const interval = setInterval(fetchMessages, 10000);
+        // Activate WebSocket
+        webSocketService.activate();
 
-        // Safety: force stop loading after 3s even if API hangs
-        const loadingTimeout = setTimeout(() => setLoading(false), 3000);
+        // Subscribe to room topic
+        const topic = `/topic/chat/${roomId}`;
+        webSocketService.subscribe(topic, (stompMessage) => {
+            try {
+                const newMsg: MessageDynamo = JSON.parse(stompMessage.body);
+                console.log("📨 WS message received:", newMsg.messageId);
+
+                setMessages((prev) => {
+                    // Don't add duplicates
+                    if (prev.some((m) => m.messageId === newMsg.messageId)) {
+                        return prev;
+                    }
+                    // Remove optimistic temp messages
+                    const filtered = prev.filter(
+                        (m) => !m.messageId.startsWith("temp-")
+                    );
+                    return [...filtered, newMsg];
+                });
+
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 150);
+            } catch (err) {
+                console.log("Error parsing WS message:", err);
+            }
+        });
 
         return () => {
-            clearInterval(interval);
-            clearTimeout(loadingTimeout);
+            webSocketService.unsubscribe(topic);
         };
-    }, [fetchMessages]);
+    }, [roomId, fetchMessages]);
 
-    // Send message
+    // ─── Send message ───
     const handleSend = async (content: string) => {
-        if (!roomId || sending) return;
+        if (!roomId || sending || !content.trim()) return;
         setSending(true);
 
-        // Optimistic: add message to list immediately
+        // Optimistic UI
         const optimisticMsg: MessageDynamo = {
             messageId: `temp-${Date.now()}`,
             chatRoomId: roomId,
@@ -87,16 +105,19 @@ export default function ChatScreen() {
         };
 
         setMessages((prev) => [...prev, optimisticMsg]);
-
-        // Scroll to bottom
         setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
 
         try {
-            await chatService.sendMessage(roomId, content);
-            // Refresh to get the real message from server
-            await fetchMessages();
+            // Try WebSocket first
+            const sentViaWs = webSocketService.sendChatMessage(roomId, content);
+            if (!sentViaWs) {
+                // Fallback to REST
+                console.log("WS not connected, falling back to REST");
+                await chatService.sendMessage(roomId, content);
+                await fetchMessages();
+            }
         } catch (err) {
             console.log("Error sending message:", err);
         } finally {
@@ -104,13 +125,13 @@ export default function ChatScreen() {
         }
     };
 
+    // ─── Render ───
     const renderMessage = ({ item }: { item: MessageDynamo }) => {
         const isMe = item.senderId === currentUserId;
         let timeDisplay = "";
         if (item.createdAt) {
             timeDisplay = formatTime(item.createdAt);
         }
-
         return (
             <MessageBubble
                 content={item.content || ""}
@@ -131,28 +152,26 @@ export default function ChatScreen() {
                 keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
                 className="flex-1"
             >
-                {loading ? (
-                    <View className="flex-1 justify-center items-center">
-                        <ActivityIndicator size="large" color="#0091FF" />
-                    </View>
-                ) : (
-                    <FlatList
-                        ref={flatListRef}
-                        data={messages}
-                        keyExtractor={(item) => item.messageId}
-                        renderItem={renderMessage}
-                        contentContainerStyle={{ paddingVertical: 8, flexGrow: 1 }}
-                        showsVerticalScrollIndicator={false}
-                        onContentSizeChange={() => {
+                <FlatList
+                    ref={flatListRef}
+                    data={messages}
+                    keyExtractor={(item) => item.messageId}
+                    renderItem={renderMessage}
+                    contentContainerStyle={{ paddingVertical: 8, flexGrow: 1 }}
+                    showsVerticalScrollIndicator={false}
+                    onContentSizeChange={() => {
+                        if (messages.length > 0) {
                             flatListRef.current?.scrollToEnd({ animated: false });
-                        }}
-                        ListEmptyComponent={() => (
-                            <View className="flex-1 justify-center items-center">
-                                <Text className="text-gray-500">Hãy gửi tin nhắn đầu tiên! 👋</Text>
-                            </View>
-                        )}
-                    />
-                )}
+                        }
+                    }}
+                    ListEmptyComponent={() => (
+                        <View className="flex-1 justify-center items-center">
+                            <Text className="text-gray-500">
+                                {loaded ? "Hãy gửi tin nhắn đầu tiên! 👋" : "Đang tải tin nhắn..."}
+                            </Text>
+                        </View>
+                    )}
+                />
 
                 <ChatFooter onSend={handleSend} />
             </KeyboardAvoidingView>
