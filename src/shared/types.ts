@@ -39,6 +39,7 @@ export interface PinMessageRequest {
 export interface Message {
     id: string;
     senderId: string;
+    senderName?: string;
     roomId: string;
     content: string;
     type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'STICKER' | 'REPLY' | 'FORWARD';

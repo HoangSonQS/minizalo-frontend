@@ -21,33 +21,35 @@ const ChatRoomItem: React.FC<ChatRoomItemProps> = ({ room, isActive, onSelect })
     };
 
     const getLastMessagePreview = () => {
-        if (!room.lastMessage) return 'Chưa có tin nhắn';
+        if (!room.lastMessage) return '';
         const { content, type } = room.lastMessage;
+        let text = '';
         switch (type) {
-            case 'TEXT':
-                return content;
-            case 'IMAGE':
-                return '[Hình ảnh]';
-            case 'VIDEO':
-                return '[Video]';
-            case 'FILE':
-                return '[Tập tin]';
-            case 'STICKER':
-                return '[Sticker]';
-            default:
-                return 'Tin nhắn mới';
+            case 'TEXT':   text = content; break;
+            case 'IMAGE':  text = '[Hình ảnh]'; break;
+            case 'VIDEO':  text = '[Video]'; break;
+            case 'FILE':   text = '[Tập tin]'; break;
+            case 'STICKER': text = '[Sticker]'; break;
+            default:       text = content || 'Tin nhắn mới';
         }
+        return text;
     };
 
     const formatTime = (isoString: string) => {
+        if (!isoString) return '';
         const date = new Date(isoString);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const now = new Date();
+        const isToday = date.toDateString() === now.toDateString();
+        if (isToday) {
+            return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
     };
 
     return (
         <div onClick={onPress} className={`cursor-pointer transition-colors ${isActive ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
             <List.Item
-                prefix={<Avatar src={room.avatarUrl || 'https://via.placeholder.com/150'} />}
+                prefix={<Avatar src={room.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(room.name)}&background=4A90D9&color=fff&size=64`} />}
                 title={room.name}
                 subTitle={getLastMessagePreview()}
                 suffix={

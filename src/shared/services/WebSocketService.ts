@@ -1,10 +1,27 @@
 import { Client, IMessage } from '@stomp/stompjs';
+<<<<<<< Updated upstream
 import { ChatMessageRequest, TypingIndicatorRequest, ReadReceiptRequest } from '../types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';
 const WS_URL = API_URL.replace(/^http/, 'ws').replace(/\/api$/, '/ws');
 
 console.log('WebSocketService initialized with URL:', WS_URL);
+=======
+import { Platform } from 'react-native';
+import { useAuthStore } from '@/shared/store/authStore';
+
+// Build URLs from API base
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';
+const HTTP_BASE = API_URL.replace(/\/api$/, '');
+
+// Web: use /ws/websocket (the raw WebSocket transport auto-exposed by SockJS on the /ws endpoint)
+//   → already permitted by Security (/ws/**), no backend change needed
+// Native: use /ws-raw (dedicated raw WS endpoint added to backend)
+const WS_URL = Platform.OS === 'web'
+    ? HTTP_BASE.replace(/^http/, 'ws') + '/ws/websocket'
+    : HTTP_BASE.replace(/^http/, 'ws') + '/ws-raw';
+
+>>>>>>> Stashed changes
 
 class WebSocketService {
     private client: Client;
@@ -13,14 +30,31 @@ class WebSocketService {
     private subscriptions: Record<string, any> = {};
 
     constructor() {
+        const isNative = Platform.OS !== 'web';
+
+        // Both browser and React Native connect to the same /ws-raw endpoint
+        // (a plain WebSocket endpoint in Spring without SockJS)
         this.client = new Client({
             brokerURL: WS_URL,
+<<<<<<< Updated upstream
             debug: (str) => {
                 console.log('STOMP: ' + str);
             },
             reconnectDelay: 5000,
             heartbeatIncoming: 4000,
             heartbeatOutgoing: 4000,
+=======
+            debug: (str) => { if (__DEV__) console.log('STOMP:', str); },
+            reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000,
+            // forceBinaryWSFrames & appendMissingNULLonIncoming are React Native-only
+            // browsers use standard binary WebSocket frames natively
+            ...(isNative ? {
+                forceBinaryWSFrames: true,
+                appendMissingNULLonIncoming: true,
+            } : {}),
+>>>>>>> Stashed changes
         });
 
         this.client.onConnect = (frame) => {
@@ -120,6 +154,11 @@ class WebSocketService {
                 body: JSON.stringify(request),
             });
         }
+    }
+
+    /** Alias for web compatibility: wraps sendChatMessage */
+    sendMessage({ receiverId, content }: { receiverId: string; content: string; type?: string }) {
+        return this.sendChatMessage(receiverId, content);
     }
 }
 
