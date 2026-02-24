@@ -30,7 +30,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
     const { user } = useAuthStore();
     const currentUserId = user?.id || '';
 
-    const { messages, addMessage, setCurrentRoom, setMessages, rooms, upsertRoom } = useChatStore();
+    const { messages, addMessage, setCurrentRoom, setMessages, upsertRoom, rooms } = useChatStore();
     const messagesState = messages[roomId] || [];
 
     // ─── Load lịch sử chat ───
@@ -54,19 +54,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
             }
             merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
             setMessages(roomId, merged);
-
-            // Cập nhật lastMessage của room trong sidebar
-            if (merged.length > 0) {
-                const lastMsg = merged[merged.length - 1];
-                const storeRoom = useChatStore.getState().rooms.find((r) => r.id === roomId);
-                if (storeRoom) {
-                    upsertRoom({ ...storeRoom, lastMessage: lastMsg, updatedAt: lastMsg.createdAt });
-                }
-            }
         } catch (error) {
             console.error('Failed to fetch chat history', error);
         }
-    }, [roomId, upsertRoom]);
+    }, [roomId]);
 
     // ─── Subscribe WebSocket topic phòng (giống mobile) ───
     useEffect(() => {
@@ -93,14 +84,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
                 const filtered = currentMessages.filter((m) => !m.id.startsWith('temp-'));
                 setMessages(roomId, [...filtered, incoming]);
 
-                // Cập nhật lastMessage trong sidebar
-                const storeRoom = useChatStore.getState().rooms.find((r) => r.id === roomId);
-                if (storeRoom) {
-                    useChatStore.getState().upsertRoom({
-                        ...storeRoom,
-                        lastMessage: incoming,
-                        updatedAt: incoming.createdAt,
-                    });
+                // Cập nhật lastMessage + updatedAt của phòng trong sidebar
+                const existingRoom = useChatStore.getState().rooms.find(r => r.id === roomId);
+                if (existingRoom) {
+                    upsertRoom({ ...existingRoom, lastMessage: incoming, updatedAt: incoming.createdAt });
                 }
             } catch (err) {
                 console.error('Error parsing WS message (web):', err);

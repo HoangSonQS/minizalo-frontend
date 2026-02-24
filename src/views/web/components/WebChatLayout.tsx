@@ -2,8 +2,8 @@ import React, { useEffect } from 'react';
 import { Box } from 'zmp-ui';
 import ChatRoomList from './ChatRoomList';
 import { useChatStore } from '@/shared/store/useChatStore';
-import { ChatRoom, Message } from '@/shared/types';
-import { chatService, ChatRoomResponse, MessageDynamo } from '@/shared/services/chatService';
+import { ChatRoom } from '@/shared/types';
+import { chatService, ChatRoomResponse } from '@/shared/services/chatService';
 import { useAuthStore } from '@/shared/store/authStore';
 import { webSocketService } from '@/shared/services/WebSocketService';
 
@@ -13,23 +13,11 @@ interface WebChatLayoutProps {
     onSelectRoom?: (roomId: string) => void;
 }
 
-/** Map MessageDynamo sang Message (dùng cho lastMessage của room) */
-function mapLastMessage(msg: MessageDynamo, roomId: string): Message {
-    return {
-        id: msg.messageId,
-        senderId: msg.senderId,
-        senderName: msg.senderName || undefined,
-        roomId,
-        content: msg.recalled ? '[Tin nhắn đã thu hồi]' : msg.content,
-        type: (msg.type as any) || 'TEXT',
-        createdAt: msg.createdAt,
-    };
-}
-
 const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId, onSelectRoom }) => {
-    const { rooms, setRooms, upsertRoom } = useChatStore();
+    const { rooms, setRooms } = useChatStore();
     const { accessToken } = useAuthStore();
 
+    // Load danh sách phòng chat từ backend (dùng chatService giống mobile)
     useEffect(() => {
         const fetchData = async () => {
             if (!accessToken) return;
@@ -42,53 +30,32 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
                     name: r.name || 'Người dùng',
                     avatarUrl: r.avatarUrl || undefined,
                     type: r.type === 'DIRECT' ? 'PRIVATE' : 'GROUP',
-                    lastMessage: r.lastMessage ? mapLastMessage(r.lastMessage, r.id) : undefined,
+                    lastMessage: r.lastMessage
+                        ? {
+                              id: r.lastMessage.messageId,
+                              senderId: r.lastMessage.senderId,
+                              roomId: r.id,
+                              content: r.lastMessage.content,
+                              type: (r.lastMessage.type as any) || 'TEXT',
+                              createdAt: r.lastMessage.createdAt,
+                          }
+                        : undefined,
                     unreadCount: r.unreadCount || 0,
-                    participants: r.members
-                        ? r.members.map((m: any) => ({
-                              id: m.userId || m.id || '',
-                              username: m.username || '',
-                              fullName: m.displayName || m.fullName || m.username || '',
-                              avatarUrl: m.avatarUrl || undefined,
-                          }))
-                        : [],
+                    participants: (r.members || []).map((m: any) => ({
+                        id: m.user?.id || m.id || '',
+                        username: m.user?.username || m.username || '',
+                        fullName: m.user?.displayName || m.user?.fullName || m.displayName || m.fullName || '',
+                        avatarUrl: m.user?.avatarUrl || m.avatarUrl || undefined,
+                    })),
                     updatedAt: r.lastMessage?.createdAt || r.createdAt || new Date().toISOString(),
                 }));
 
+                // Sort mới nhất lên đầu
                 allRooms.sort(
                     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
                 );
 
                 setRooms(allRooms);
-
-                // Fetch last message cho phòng chưa có (backend không trả về lastMessage)
-                const roomsNeedLastMsg = allRooms.filter((r) => !r.lastMessage);
-                if (roomsNeedLastMsg.length > 0) {
-                    await Promise.all(
-                        roomsNeedLastMsg.map(async (room) => {
-                            try {
-                                const history = await chatService.getChatHistory(room.id, 20);
-                                const msgs = (history.messages || [])
-                                    .slice()
-                                    .sort(
-                                        (a, b) =>
-                                            new Date(a.createdAt).getTime() -
-                                            new Date(b.createdAt).getTime()
-                                    );
-                                if (msgs.length > 0) {
-                                    const lastMsg = msgs[msgs.length - 1];
-                                    upsertRoom({
-                                        ...room,
-                                        lastMessage: mapLastMessage(lastMsg, room.id),
-                                        updatedAt: lastMsg.createdAt,
-                                    });
-                                }
-                            } catch {
-                                // bỏ qua lỗi từng phòng
-                            }
-                        })
-                    );
-                }
             } catch (error) {
                 console.error('Failed to fetch chat rooms', error);
             }
@@ -97,6 +64,7 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
         fetchData();
     }, [accessToken]);
 
+    // Activate WebSocket khi có token (subscribe cụ thể từng phòng để ChatWindow quản lý)
     useEffect(() => {
         if (!accessToken) return;
         webSocketService.activate(accessToken);

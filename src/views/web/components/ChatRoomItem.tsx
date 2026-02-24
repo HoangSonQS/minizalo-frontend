@@ -21,29 +21,28 @@ const ChatRoomItem: React.FC<ChatRoomItemProps> = ({ room, isActive, onSelect })
     };
 
     const getLastMessagePreview = () => {
-        if (!room.lastMessage) return '';
+        if (!room.lastMessage) return 'Chưa có tin nhắn';
         const { content, type } = room.lastMessage;
-        let text = '';
         switch (type) {
-            case 'TEXT':   text = content; break;
-            case 'IMAGE':  text = '[Hình ảnh]'; break;
-            case 'VIDEO':  text = '[Video]'; break;
-            case 'FILE':   text = '[Tập tin]'; break;
-            case 'STICKER': text = '[Sticker]'; break;
-            default:       text = content || 'Tin nhắn mới';
+            case 'TEXT':
+                return content;
+            case 'IMAGE':
+                return '[Hình ảnh]';
+            case 'VIDEO':
+                return '[Video]';
+            case 'FILE':
+                return '[Tập tin]';
+            case 'STICKER':
+                return '[Sticker]';
+            default:
+                return 'Tin nhắn mới';
         }
-        return text;
     };
 
-    const formatTime = (isoString: string) => {
+    const formatTime = (isoString?: string) => {
         if (!isoString) return '';
         const date = new Date(isoString);
-        const now = new Date();
-        const isToday = date.toDateString() === now.toDateString();
-        if (isToday) {
-            return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
-        }
-        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
     };
 
     return (
@@ -54,7 +53,7 @@ const ChatRoomItem: React.FC<ChatRoomItemProps> = ({ room, isActive, onSelect })
                 subTitle={getLastMessagePreview()}
                 suffix={
                     <Box className="flex flex-col items-end">
-                         <Text size="xSmall" className="text-gray-500">{formatTime(room.updatedAt)}</Text>
+                         <Text size="xSmall" className="text-gray-500">{formatTime(room.lastMessage?.createdAt || room.updatedAt)}</Text>
                          {room.unreadCount > 0 && (
                             <Box className="bg-red-500 rounded-full w-5 h-5 flex items-center justify-center mt-1">
                                 <Text size="xSmall" className="text-white font-bold">{room.unreadCount}</Text>

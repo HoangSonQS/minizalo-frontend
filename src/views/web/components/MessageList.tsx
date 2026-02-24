@@ -77,7 +77,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, currentUserId, part
                         const showAvatar = !isMine && isLastInGroup;
 
                         // Tên hiển thị ở tin nhắn ĐẦU của nhóm
-                        // Ưu tiên: senderName từ backend > participants > fallback UUID
+                        // Ưu tiên: senderName trong message (từ backend) > participant lookup > UUID fallback
                         const sender = participantMap[msg.senderId];
                         const senderName = !isMine && isFirstInGroup
                             ? (msg.senderName || sender?.fullName || sender?.username || msg.senderId?.slice(0, 8))
