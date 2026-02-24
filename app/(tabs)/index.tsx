@@ -1,4 +1,4 @@
-import { View, Text, Platform } from "react-native";
+import { Platform, Text } from "react-native";
 import React from "react";
 import ChatListScreen from "@/views/mobile/chat/screens/ChatListScreen";
 
@@ -14,5 +14,6 @@ export default function TabsIndex() {
         );
     }
 
+    // Mobile
     return <ChatListScreen />;
 }

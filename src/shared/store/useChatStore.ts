@@ -71,8 +71,8 @@ export const useChatStore = create<ChatState>((set) => ({
                 // Chỉ set unreadCount > 0 nếu:
                 // 1. Không phải phòng đang mở
                 // 2. Không phải tin nhắn nháp (temp-)
-                // 3. Không phải tin nhắn do chính user gửi (từ thiết bị/tab khác)
-                const isUnread = state.currentRoomId !== roomId && !message.id.startsWith('temp-') && message.senderId !== currentUserId;
+                // 3. Không phải tin nhắn do chính user gửi
+                const isUnread = state.currentRoomId !== roomId && !message.id.startsWith('temp-') && (!currentUserId || message.senderId !== currentUserId);
                 return {
                     ...room,
                     lastMessage: message,

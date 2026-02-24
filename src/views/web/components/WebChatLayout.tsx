@@ -43,7 +43,7 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
                               createdAt: r.lastMessage.createdAt,
                           }
                         : undefined,
-                    unreadCount: existing ? existing.unreadCount : (r.unreadCount || 0),
+                    unreadCount: Math.max(existing ? existing.unreadCount : 0, r.unreadCount || 0),
                     participants: (r.members || []).map((m: any) => ({
                         id: m.user?.id || m.id || '',
                         username: m.user?.username || m.username || '',
