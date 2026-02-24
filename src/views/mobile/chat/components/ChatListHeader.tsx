@@ -4,8 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 export const ChatListHeader = () => {
     return (
-        <SafeAreaView className="bg-[#0091FF]" style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }}>
-            <View className="flex-row items-center px-4 py-2 bg-[#0091FF] space-x-3">
+        <SafeAreaView className="bg-black" style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }}>
+            <View className="flex-row items-center px-4 py-2 bg-black space-x-3">
                 <View className="flex-1 flex-row items-center bg-transparent">
                     <Ionicons name="search" size={24} color="white" />
                     <Text className="text-white ml-3 text-base font-medium">Tìm kiếm</Text>

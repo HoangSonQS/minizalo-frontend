@@ -20,7 +20,7 @@ export default function ChatHeader({ name, onBack }: ChatHeaderProps) {
     };
 
     return (
-        <View className="bg-[#0091FF] pt-0">
+        <View className="bg-[#1a1a1a] pt-0">
             {/* Status bar spacer managed by SafeAreaView or manual padding if needed, 
                 but usually header height handles it. 
                 For Zalo style, the header is blue.
