@@ -1,89 +1,124 @@
-import React from "react";
-import { View, FlatList } from "react-native";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { View, FlatList, ActivityIndicator, Text, RefreshControl, AppState } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { ChatListHeader } from "../components/ChatListHeader";
 import { PinnedCloudItem } from "../components/PinnedCloudItem";
 import { ChatItem } from "../components/ChatItem";
-
-const DATA = [
-    {
-        id: "1",
-        name: "Media Box",
-        message: "Zing MP3: [APP] Hãy để KAKA khai...",
-        time: "",
-        avatar: { uri: "https://ui-avatars.com/api/?name=Media+Box&background=random&color=fff" },
-        unreadCount: 5,
-        isVerified: false,
-    },
-    {
-        id: "2",
-        name: "Thời Tiết",
-        message: "☁️ Chất lượng không khí Sài Gòn ở...",
-        time: "5 giờ",
-        avatar: { uri: "https://ui-avatars.com/api/?name=Thoi+Tiet&background=0D8ABC&color=fff" },
-        unreadCount: 1,
-        isVerified: true,
-    },
-    {
-        id: "3",
-        name: "Cộng đồng Game Online",
-        message: "⭐️Thư Giãn Sảng Khoái Cùng Crazy...",
-        time: "T4",
-        avatar: { uri: "https://ui-avatars.com/api/?name=Game+Online&background=4CAF50&color=fff" },
-        unreadCount: 2,
-        isVerified: true,
-    },
-    {
-        id: "4",
-        name: "ZaloPay",
-        message: "Bạn có voucher Hóa đơn| Giảm 50K...",
-        time: "T2",
-        avatar: { uri: "https://ui-avatars.com/api/?name=Zalo+Pay&background=0068FF&color=fff" },
-        unreadCount: 1,
-        isVerified: true,
-    },
-    {
-        id: "5",
-        name: "Zalo Sticker",
-        message: "ỦA ĐANG CHƠI DZUI TỰ NHIÊN KHỊA?...",
-        time: "T2",
-        avatar: { uri: "https://ui-avatars.com/api/?name=Zalo+Sticker&background=FFC107&color=fff" },
-        unreadCount: 3,
-        isVerified: true,
-    },
-].filter(item => item.id !== "6");
+import { chatService, ChatRoomResponse } from "@/shared/services/chatService";
+import { formatTime } from "@/shared/utils/dateUtils";
 
 export default function ChatListScreen() {
     const router = useRouter();
+    const [chats, setChats] = useState<ChatRoomResponse[]>([]);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchChats().finally(() => setRefreshing(false));
+    }, []);
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const hasLoadedOnce = useRef(false);
+
+    const fetchChats = async (showLoading = false) => {
+        try {
+            if (showLoading && !hasLoadedOnce.current) setLoading(true);
+            setError(null);
+            const data = await chatService.getChatRooms();
+            setChats(data);
+            hasLoadedOnce.current = true;
+        } catch (err: any) {
+            console.log("Error fetching chats:", err);
+            if (chats.length === 0) {
+                setError(err.message || "Failed to fetch chats");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Auto-fetch when screen is focused
+    useFocusEffect(
+        useCallback(() => {
+            fetchChats(true);
+
+            // Auto-refresh every 30 seconds while focused (background, no loading)
+            const interval = setInterval(() => {
+                fetchChats(false);
+            }, 30000);
+
+            return () => clearInterval(interval);
+        }, [])
+    );
+
+    const renderItem = ({ item }: { item: ChatRoomResponse }) => {
+        const avatarUri = item.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || "User")}&background=random&color=fff`;
+        const lastMsg = item.lastMessage?.content
+            ? (item.lastMessage.type === 'IMAGE' ? '[Hình ảnh]' : item.lastMessage.type === 'FILE' ? '[Tập tin]' : item.lastMessage.content)
+            : "Chưa có tin nhắn";
+
+        let timeDisplay = "";
+        if (item.lastMessage?.createdAt) {
+            timeDisplay = formatTime(item.lastMessage.createdAt);
+        } else if (item.createdAt) {
+            timeDisplay = formatTime(item.createdAt);
+        }
+
+        return (
+            <ChatItem
+                avatar={{ uri: avatarUri }}
+                name={item.name || "Người dùng"}
+                message={lastMsg}
+                time={timeDisplay}
+                unreadCount={item.unreadCount}
+                isVerified={false}
+                onPress={() => router.push(`/chat/${item.id}?name=${encodeURIComponent(item.name || "")}`)}
+            />
+        );
+    };
 
     return (
-        <View className="flex-1 bg-white">
+        <View className="flex-1 bg-black">
             <ChatListHeader />
-            <FlatList
-                data={DATA}
-                keyExtractor={(item) => item.id}
-                ListHeaderComponent={() => (
-                    <View>
-                        <PinnedCloudItem />
-                    </View>
-                )}
-                renderItem={({ item }) => (
-                    <ChatItem
-                        avatar={item.avatar}
-                        name={item.name}
-                        message={item.message}
-                        time={item.time}
-                        unreadCount={item.unreadCount}
-                        isVerified={item.isVerified}
-                        onPress={() => router.push({
-                            pathname: "/chat/[id]",
-                            params: { id: item.id, name: item.name }
-                        })}
-                    />
-                )}
-                contentContainerStyle={{ paddingBottom: 100 }}
-                showsVerticalScrollIndicator={false}
-            />
+            {loading ? (
+                <View className="flex-1 justify-center items-center">
+                    <ActivityIndicator size="large" color="#0068FF" />
+                </View>
+            ) : error ? (
+                <View className="flex-1 justify-center items-center">
+                    <Text className="text-red-400 mb-2">Không thể tải danh sách tin nhắn</Text>
+                    <Text className="text-gray-400 text-xs">{error}</Text>
+                    <Text className="text-blue-400 mt-4" onPress={onRefresh}>Thử lại</Text>
+                </View>
+            ) : chats.length === 0 ? (
+                <FlatList
+                    contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    data={[]}
+                    renderItem={null}
+                    ListEmptyComponent={() => (
+                        <View className="items-center">
+                            <Text className="text-gray-400">Chưa có cuộc trò chuyện nào</Text>
+                        </View>
+                    )}
+                />
+            ) : (
+                <FlatList
+                    data={chats}
+                    keyExtractor={(item) => item.id}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    ListHeaderComponent={() => (
+                        <View>
+                            <PinnedCloudItem />
+                        </View>
+                    )}
+                    renderItem={renderItem}
+                    contentContainerStyle={{ paddingBottom: 100 }}
+                    showsVerticalScrollIndicator={false}
+                />
+            )}
         </View>
     );
 }
