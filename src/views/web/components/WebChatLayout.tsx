@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box } from 'zmp-ui';
 import ChatRoomList from './ChatRoomList';
 import { useChatStore } from '@/shared/store/useChatStore';
@@ -16,54 +16,49 @@ interface WebChatLayoutProps {
 const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId, onSelectRoom }) => {
     const { rooms, setRooms } = useChatStore();
     const { accessToken } = useAuthStore();
+    // Track which room IDs we've already subscribed to, to avoid re-subscribing
+    const subscribedRoomIds = useRef<Set<string>>(new Set());
 
-    // Load danh sách phòng chat từ backend (dùng chatService giống mobile)
+    // Load danh sách phòng chat từ backend
     useEffect(() => {
         const fetchData = async () => {
             if (!accessToken) return;
-
             try {
                 const data: ChatRoomResponse[] = await chatService.getChatRooms();
-
                 const existingRooms = useChatStore.getState().rooms;
                 const allRooms: ChatRoom[] = data.map((r) => {
                     const existing = existingRooms.find(er => er.id === r.id);
                     return {
                         id: r.id,
                         name: r.name || 'Người dùng',
-                    avatarUrl: r.avatarUrl || undefined,
-                    type: r.type === 'DIRECT' ? 'PRIVATE' : 'GROUP',
-                    lastMessage: r.lastMessage
-                        ? {
-                              id: r.lastMessage.messageId,
-                              senderId: r.lastMessage.senderId,
-                              roomId: r.id,
-                              content: r.lastMessage.content,
-                              type: (r.lastMessage.type as any) || 'TEXT',
-                              createdAt: r.lastMessage.createdAt,
-                          }
-                        : undefined,
-                    unreadCount: Math.max(existing ? existing.unreadCount : 0, r.unreadCount || 0),
-                    participants: (r.members || []).map((m: any) => ({
-                        id: m.user?.id || m.id || '',
-                        username: m.user?.username || m.username || '',
-                        fullName: m.user?.displayName || m.user?.fullName || m.displayName || m.fullName || '',
-                        avatarUrl: m.user?.avatarUrl || m.avatarUrl || undefined,
-                    })),
-                    updatedAt: r.lastMessage?.createdAt || r.createdAt || new Date().toISOString(),
-                };});
-
-                // Sort mới nhất lên đầu
-                allRooms.sort(
-                    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-                );
-
+                        avatarUrl: r.avatarUrl || undefined,
+                        type: r.type === 'DIRECT' ? 'PRIVATE' : 'GROUP',
+                        lastMessage: r.lastMessage
+                            ? {
+                                  id: r.lastMessage.messageId,
+                                  senderId: r.lastMessage.senderId,
+                                  roomId: r.id,
+                                  content: r.lastMessage.content,
+                                  type: (r.lastMessage.type as any) || 'TEXT',
+                                  createdAt: r.lastMessage.createdAt,
+                              }
+                            : undefined,
+                        unreadCount: Math.max(existing ? existing.unreadCount : 0, r.unreadCount || 0),
+                        participants: (r.members || []).map((m: any) => ({
+                            id: m.user?.id || m.id || '',
+                            username: m.user?.username || m.username || '',
+                            fullName: m.user?.displayName || m.user?.fullName || m.displayName || m.fullName || '',
+                            avatarUrl: m.user?.avatarUrl || m.avatarUrl || undefined,
+                        })),
+                        updatedAt: r.lastMessage?.createdAt || r.createdAt || new Date().toISOString(),
+                    };
+                });
+                allRooms.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
                 setRooms(allRooms);
             } catch (error) {
                 console.error('Failed to fetch chat rooms', error);
             }
         };
-
         fetchData();
     }, [accessToken]);
 
@@ -73,15 +68,16 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
         webSocketService.activate(accessToken);
     }, [accessToken]);
 
-    // Theo dõi tin nhắn từ tất cả các phòng để tăng badge hiển thị và cập nhật ChatWindow
+    // Subscribe tới các phòng mới (chỉ subscribe 1 lần mỗi phòng, không unsubscribe khi rooms thay đổi)
     useEffect(() => {
         if (rooms.length === 0) return;
-        
-        const topics: string[] = [];
+
         rooms.forEach((room) => {
+            if (subscribedRoomIds.current.has(room.id)) return; // Đã subscribe rồi, bỏ qua
+
             const topic = `/topic/chat/${room.id}`;
-            topics.push(topic);
-            
+            const roomId = room.id;
+
             webSocketService.subscribe(topic, (stompMsg) => {
                 try {
                     const dynamo = JSON.parse(stompMsg.body);
@@ -89,24 +85,36 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
                         id: dynamo.messageId,
                         senderId: dynamo.senderId,
                         senderName: dynamo.senderName || undefined,
-                        roomId: room.id,
+                        roomId: roomId,
                         content: dynamo.recalled ? '[Tin nhắn đã thu hồi]' : dynamo.content,
                         type: (dynamo.type as any) || 'TEXT',
                         createdAt: dynamo.createdAt,
                         readBy: dynamo.readBy,
                     };
-                    useChatStore.getState().addMessage(room.id, incoming);
+                    console.log('[Global WS] Message received room:', roomId, incoming);
+                    useChatStore.getState().addMessage(roomId, incoming);
                 } catch (err) {
                     console.error('Lỗi parse tin nhắn global WS:', err);
                 }
             });
+
+            subscribedRoomIds.current.add(room.id);
+            console.log('[Global WS] Subscribed to room:', room.id);
         });
-        
+
+        // Cleanup chỉ khi component unmount hoàn toàn
+        return () => {};
+    }, [rooms.length]); // Chỉ chạy lại khi số lượng phòng thay đổi (thêm phòng mới)
+
+    // Cleanup khi unmount hoàn toàn
+    useEffect(() => {
         return () => {
-             // Dọn dẹp listener cũ khi component bị unmount hoặc rooms update, để tránh duplicate message.
-             topics.forEach(topic => webSocketService.unsubscribe(topic));
+            subscribedRoomIds.current.forEach(roomId => {
+                webSocketService.unsubscribe(`/topic/chat/${roomId}`);
+            });
+            subscribedRoomIds.current.clear();
         };
-    }, [rooms]);
+    }, []);
 
     return (
         <div className="flex h-screen bg-white">

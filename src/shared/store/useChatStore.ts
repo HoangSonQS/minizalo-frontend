@@ -2,6 +2,28 @@ import { create } from 'zustand';
 import { Message } from '../types';
 import { useAuthStore } from './authStore';
 
+/** Decode JWT payload để lấy user ID (sub) mà không cần import thư viện */
+function getMyUserIdFromToken(): string | null {
+    try {
+        const token = useAuthStore.getState().accessToken;
+        if (!token) return null;
+        const base64Url = token.split('.')[1];
+        if (!base64Url) return null;
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const json = decodeURIComponent(
+            atob(base64)
+                .split('')
+                .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+        );
+        const payload = JSON.parse(json);
+        // 'sub' is the user ID in our JWT
+        return payload.sub || payload.userId || null;
+    } catch {
+        return null;
+    }
+}
+
 interface ChatState {
     messages: Record<string, Message[]>; // roomId -> messages
     rooms: import('../types').ChatRoom[];
@@ -56,23 +78,29 @@ export const useChatStore = create<ChatState>((set) => ({
 
         // Bỏ tin nhắn optimistic (temp-*) của sender khi nhận được real message
         let filteredMessages = [...roomMessages];
-        if (!message.id.startsWith('temp-')) {
-            const tempIdx = filteredMessages.findIndex(m => m.id.startsWith('temp-') && m.senderId === message.senderId);
+        if (message.id && !message.id.startsWith('temp-')) {
+            const tempIdx = filteredMessages.findIndex(m => m.id && m.id.startsWith('temp-') && m.senderId === message.senderId);
             if (tempIdx !== -1) {
                 // Xóa tin nhắn temp đầu tiên tìm thấy
                 filteredMessages.splice(tempIdx, 1);
             }
         }
 
-        const currentUserId = useAuthStore.getState().user?.id;
+        // Lấy userId từ JWT token (an toàn hơn user?.id có thể null)
+        const currentUserId = useAuthStore.getState().user?.id || getMyUserIdFromToken();
 
         const newRooms = state.rooms.map((room) => {
             if (room.id === roomId) {
                 // Chỉ set unreadCount > 0 nếu:
-                // 1. Không phải phòng đang mở
+                // 1. Không phải phòng đang mở (currentRoomId)
                 // 2. Không phải tin nhắn nháp (temp-)
                 // 3. Không phải tin nhắn do chính user gửi
-                const isUnread = state.currentRoomId !== roomId && !message.id.startsWith('temp-') && (!currentUserId || message.senderId !== currentUserId);
+                const isTemp = message.id && message.id.startsWith('temp-');
+                const isMine = currentUserId != null && message.senderId === currentUserId;
+                const isUnread = state.currentRoomId !== roomId && !isTemp && !isMine;
+                
+                console.log(`[Store] addMessage room=${roomId} isUnread=${isUnread} | currentRoom=${state.currentRoomId} sender=${message.senderId} me=${currentUserId}`);
+                
                 return {
                     ...room,
                     lastMessage: message,
