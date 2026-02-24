@@ -25,9 +25,12 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
             try {
                 const data: ChatRoomResponse[] = await chatService.getChatRooms();
 
-                const allRooms: ChatRoom[] = data.map((r) => ({
-                    id: r.id,
-                    name: r.name || 'Người dùng',
+                const existingRooms = useChatStore.getState().rooms;
+                const allRooms: ChatRoom[] = data.map((r) => {
+                    const existing = existingRooms.find(er => er.id === r.id);
+                    return {
+                        id: r.id,
+                        name: r.name || 'Người dùng',
                     avatarUrl: r.avatarUrl || undefined,
                     type: r.type === 'DIRECT' ? 'PRIVATE' : 'GROUP',
                     lastMessage: r.lastMessage
@@ -40,7 +43,7 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
                               createdAt: r.lastMessage.createdAt,
                           }
                         : undefined,
-                    unreadCount: r.unreadCount || 0,
+                    unreadCount: existing ? existing.unreadCount : (r.unreadCount || 0),
                     participants: (r.members || []).map((m: any) => ({
                         id: m.user?.id || m.id || '',
                         username: m.user?.username || m.username || '',
@@ -48,7 +51,7 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
                         avatarUrl: m.user?.avatarUrl || m.avatarUrl || undefined,
                     })),
                     updatedAt: r.lastMessage?.createdAt || r.createdAt || new Date().toISOString(),
-                }));
+                };});
 
                 // Sort mới nhất lên đầu
                 allRooms.sort(
@@ -64,11 +67,46 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
         fetchData();
     }, [accessToken]);
 
-    // Activate WebSocket khi có token (subscribe cụ thể từng phòng để ChatWindow quản lý)
+    // Activate WebSocket khi có token
     useEffect(() => {
         if (!accessToken) return;
         webSocketService.activate(accessToken);
     }, [accessToken]);
+
+    // Theo dõi tin nhắn từ tất cả các phòng để tăng badge hiển thị và cập nhật ChatWindow
+    useEffect(() => {
+        if (rooms.length === 0) return;
+        
+        const topics: string[] = [];
+        rooms.forEach((room) => {
+            const topic = `/topic/chat/${room.id}`;
+            topics.push(topic);
+            
+            webSocketService.subscribe(topic, (stompMsg) => {
+                try {
+                    const dynamo = JSON.parse(stompMsg.body);
+                    const incoming = {
+                        id: dynamo.messageId,
+                        senderId: dynamo.senderId,
+                        senderName: dynamo.senderName || undefined,
+                        roomId: room.id,
+                        content: dynamo.recalled ? '[Tin nhắn đã thu hồi]' : dynamo.content,
+                        type: (dynamo.type as any) || 'TEXT',
+                        createdAt: dynamo.createdAt,
+                        readBy: dynamo.readBy,
+                    };
+                    useChatStore.getState().addMessage(room.id, incoming);
+                } catch (err) {
+                    console.error('Lỗi parse tin nhắn global WS:', err);
+                }
+            });
+        });
+        
+        return () => {
+             // Dọn dẹp listener cũ khi component bị unmount hoặc rooms update, để tránh duplicate message.
+             topics.forEach(topic => webSocketService.unsubscribe(topic));
+        };
+    }, [rooms]);
 
     return (
         <div className="flex h-screen bg-white">

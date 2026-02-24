@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Message } from '../types';
+import { useAuthStore } from './authStore';
 
 interface ChatState {
     messages: Record<string, Message[]>; // roomId -> messages
@@ -40,18 +41,56 @@ export const useChatStore = create<ChatState>((set) => ({
         }
     }),
 
-    setCurrentRoom: (roomId) => set({ currentRoomId: roomId }),
+    setCurrentRoom: (roomId) => set((state) => {
+        if (!roomId) return { currentRoomId: null };
+        const newRooms = state.rooms.map(room => 
+            room.id === roomId ? { ...room, unreadCount: 0 } : room
+        );
+        return { currentRoomId: roomId, rooms: newRooms };
+    }),
 
     addMessage: (roomId, message) => set((state) => {
         const roomMessages = state.messages[roomId] || [];
-        // Prevent duplicates
+        // Prevent duplicates by ID
         if (roomMessages.some(m => m.id === message.id)) return state;
+
+        // Bỏ tin nhắn optimistic (temp-*) của sender khi nhận được real message
+        let filteredMessages = [...roomMessages];
+        if (!message.id.startsWith('temp-')) {
+            const tempIdx = filteredMessages.findIndex(m => m.id.startsWith('temp-') && m.senderId === message.senderId);
+            if (tempIdx !== -1) {
+                // Xóa tin nhắn temp đầu tiên tìm thấy
+                filteredMessages.splice(tempIdx, 1);
+            }
+        }
+
+        const currentUserId = useAuthStore.getState().user?.id;
+
+        const newRooms = state.rooms.map((room) => {
+            if (room.id === roomId) {
+                // Chỉ set unreadCount > 0 nếu:
+                // 1. Không phải phòng đang mở
+                // 2. Không phải tin nhắn nháp (temp-)
+                // 3. Không phải tin nhắn do chính user gửi (từ thiết bị/tab khác)
+                const isUnread = state.currentRoomId !== roomId && !message.id.startsWith('temp-') && message.senderId !== currentUserId;
+                return {
+                    ...room,
+                    lastMessage: message,
+                    updatedAt: message.createdAt || new Date().toISOString(),
+                    unreadCount: isUnread ? (room.unreadCount || 0) + 1 : room.unreadCount
+                };
+            }
+            return room;
+        });
+
+        newRooms.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
         return {
             messages: {
                 ...state.messages,
-                [roomId]: [...roomMessages, message],
+                [roomId]: [...filteredMessages, message],
             },
+            rooms: newRooms,
         };
     }),
 
