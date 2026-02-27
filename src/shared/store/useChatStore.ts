@@ -1,5 +1,28 @@
 import { create } from 'zustand';
 import { Message } from '../types';
+import { useAuthStore } from './authStore';
+
+/** Decode JWT payload để lấy user ID (sub) mà không cần import thư viện */
+function getMyUserIdFromToken(): string | null {
+    try {
+        const token = useAuthStore.getState().accessToken;
+        if (!token) return null;
+        const base64Url = token.split('.')[1];
+        if (!base64Url) return null;
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const json = decodeURIComponent(
+            atob(base64)
+                .split('')
+                .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+        );
+        const payload = JSON.parse(json);
+        // 'sub' is the user ID in our JWT
+        return payload.sub || payload.userId || null;
+    } catch {
+        return null;
+    }
+}
 
 interface ChatState {
     messages: Record<string, Message[]>; // roomId -> messages
@@ -40,18 +63,62 @@ export const useChatStore = create<ChatState>((set) => ({
         }
     }),
 
-    setCurrentRoom: (roomId) => set({ currentRoomId: roomId }),
+    setCurrentRoom: (roomId) => set((state) => {
+        if (!roomId) return { currentRoomId: null };
+        const newRooms = state.rooms.map(room => 
+            room.id === roomId ? { ...room, unreadCount: 0 } : room
+        );
+        return { currentRoomId: roomId, rooms: newRooms };
+    }),
 
     addMessage: (roomId, message) => set((state) => {
         const roomMessages = state.messages[roomId] || [];
-        // Prevent duplicates
+        // Prevent duplicates by ID
         if (roomMessages.some(m => m.id === message.id)) return state;
+
+        // Bỏ tin nhắn optimistic (temp-*) của sender khi nhận được real message
+        let filteredMessages = [...roomMessages];
+        if (message.id && !message.id.startsWith('temp-')) {
+            const tempIdx = filteredMessages.findIndex(m => m.id && m.id.startsWith('temp-') && m.senderId === message.senderId);
+            if (tempIdx !== -1) {
+                // Xóa tin nhắn temp đầu tiên tìm thấy
+                filteredMessages.splice(tempIdx, 1);
+            }
+        }
+
+        // Lấy userId từ JWT token (an toàn hơn user?.id có thể null)
+        const currentUserId = useAuthStore.getState().user?.id || getMyUserIdFromToken();
+
+        const newRooms = state.rooms.map((room) => {
+            if (room.id === roomId) {
+                // Chỉ set unreadCount > 0 nếu:
+                // 1. Không phải phòng đang mở (currentRoomId)
+                // 2. Không phải tin nhắn nháp (temp-)
+                // 3. Không phải tin nhắn do chính user gửi
+                const isTemp = message.id && message.id.startsWith('temp-');
+                const isMine = currentUserId != null && message.senderId === currentUserId;
+                const isUnread = state.currentRoomId !== roomId && !isTemp && !isMine;
+                
+                console.log(`[Store] addMessage room=${roomId} isUnread=${isUnread} | currentRoom=${state.currentRoomId} sender=${message.senderId} me=${currentUserId}`);
+                
+                return {
+                    ...room,
+                    lastMessage: message,
+                    updatedAt: message.createdAt || new Date().toISOString(),
+                    unreadCount: isUnread ? (room.unreadCount || 0) + 1 : room.unreadCount
+                };
+            }
+            return room;
+        });
+
+        newRooms.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
         return {
             messages: {
                 ...state.messages,
-                [roomId]: [...roomMessages, message],
+                [roomId]: [...filteredMessages, message],
             },
+            rooms: newRooms,
         };
     }),
 

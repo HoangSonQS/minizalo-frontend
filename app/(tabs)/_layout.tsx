@@ -50,6 +50,8 @@ export default function TabsLayout() {
                     tabBarInactiveTintColor: "#8e8e93",
                     tabBarStyle: { backgroundColor: "#0d0d0d", borderTopColor: "#2a2a2a" },
                     tabBarLabelStyle: { fontSize: 11 },
+                    // Khi bàn phím ảo mở, ẩn thanh tab để tránh bị "đẩy" lên
+                    tabBarHideOnKeyboard: true,
                 }}
             >
                 <Tabs.Screen
@@ -70,6 +72,7 @@ export default function TabsLayout() {
                         ),
                     }}
                 />
+                <Tabs.Screen name="contacts-search" options={{ href: null }} />
                 <Tabs.Screen
                     name="explore"
                     options={{

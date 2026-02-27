@@ -45,7 +45,7 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
                 {/* Bottom Row: Message + Badge */}
                 <View className="flex-row justify-between items-center">
                     <Text
-                        className={`text-[14px] flex-1 mr-4 ${unreadCount ? 'text-gray-200 font-medium' : 'text-gray-500'}`}
+                        className={`text-[14px] flex-1 mr-4 ${unreadCount && unreadCount > 0 ? 'text-gray-200 font-bold' : 'text-gray-500'}`}
                         numberOfLines={1}
                         ellipsizeMode="tail"
                     >

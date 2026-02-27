@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFriendStore } from "@/shared/store/friendStore";
 import type { FriendResponseDto } from "@/shared/services/types";
@@ -251,11 +252,12 @@ export default function FriendRequestsMobile() {
     const currentList = tab === "received" ? requests : sentRequests;
 
     return (
-        <View
+        <SafeAreaView
             style={{
                 flex: 1,
                 backgroundColor: PROFILE_COLORS.background,
             }}
+            edges={["top"]}
         >
             {/* Header: nút back + tiêu đề giống Zalo */}
             <View
@@ -420,7 +422,7 @@ export default function FriendRequestsMobile() {
                     contentContainerStyle={{ paddingBottom: 24 }}
                 />
             )}
-        </View>
+        </SafeAreaView>
     );
 }
 

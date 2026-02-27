@@ -68,34 +68,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
         // Đảm bảo WS được kích hoạt (giống mobile ChatScreen)
         webSocketService.activate();
 
+        // Fetch lịch sử tin nhắn khi vào phòng
         fetchHistory();
 
-        const topic = `/topic/chat/${roomId}`;
-        webSocketService.subscribe(topic, (stompMsg) => {
-            try {
-                const dynamo: MessageDynamo = JSON.parse(stompMsg.body);
-                console.log('📨 WS message received (web):', dynamo.messageId);
-
-                const incoming = mapDynamoToMessage(dynamo, roomId);
-
-                // Loại trùng lặp + xóa optimistic temp-* (giống mobile ChatScreen)
-                const currentMessages = useChatStore.getState().messages[roomId] || [];
-                if (currentMessages.some((m) => m.id === incoming.id)) return;
-                const filtered = currentMessages.filter((m) => !m.id.startsWith('temp-'));
-                setMessages(roomId, [...filtered, incoming]);
-
-                // Cập nhật lastMessage + updatedAt của phòng trong sidebar
-                const existingRoom = useChatStore.getState().rooms.find(r => r.id === roomId);
-                if (existingRoom) {
-                    upsertRoom({ ...existingRoom, lastMessage: incoming, updatedAt: incoming.createdAt });
-                }
-            } catch (err) {
-                console.error('Error parsing WS message (web):', err);
-            }
-        });
-
         return () => {
-            webSocketService.unsubscribe(topic);
             setCurrentRoom(null);
         };
     }, [roomId, fetchHistory]);
