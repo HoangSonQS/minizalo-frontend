@@ -120,7 +120,12 @@ export default function AddFriendMobileScreen() {
         }
         try {
             await sendRequest(userId);
-            Alert.alert("Thành công", "Đã gửi lời mời kết bạn.");
+            Alert.alert("Thành công", "Đã gửi lời mời kết bạn.", [
+                {
+                    text: "OK",
+                    onPress: () => router.replace("/(tabs)"),
+                },
+            ]);
         } catch {
             Alert.alert("Lỗi", "Gửi lời mời kết bạn thất bại.");
         }
@@ -374,11 +379,11 @@ export default function AddFriendMobileScreen() {
                                     alignItems: "center",
                                     opacity:
                                         currentUserId &&
-                                        (currentUserId === resultUser.id ||
-                                            friendIdSet.has(resultUser.id) ||
-                                            pendingRequestIdSet.has(
-                                                resultUser.id
-                                            ))
+                                            (currentUserId === resultUser.id ||
+                                                friendIdSet.has(resultUser.id) ||
+                                                pendingRequestIdSet.has(
+                                                    resultUser.id
+                                                ))
                                             ? 0.6
                                             : 1,
                                 }}
@@ -393,10 +398,10 @@ export default function AddFriendMobileScreen() {
                                     {currentUserId && currentUserId === resultUser.id
                                         ? "Bạn"
                                         : friendIdSet.has(resultUser.id)
-                                        ? "Đã là bạn"
-                                        : pendingRequestIdSet.has(resultUser.id)
-                                        ? "Đã gửi"
-                                        : "Kết bạn"}
+                                            ? "Đã là bạn"
+                                            : pendingRequestIdSet.has(resultUser.id)
+                                                ? "Đã gửi"
+                                                : "Kết bạn"}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -509,4 +514,3 @@ export default function AddFriendMobileScreen() {
         </SafeAreaView>
     );
 }
-

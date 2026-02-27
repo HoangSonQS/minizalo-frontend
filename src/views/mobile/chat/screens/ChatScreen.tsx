@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { View, FlatList, Text, KeyboardAvoidingView, Platform, Animated, Dimensions } from "react-native";
 import { useRoute } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import ChatHeader from "../components/ChatHeader";
 import ChatFooter from "../components/ChatFooter";
 import MessageBubble from "../components/MessageBubble";
@@ -9,11 +10,14 @@ import { webSocketService } from "@/shared/services/WebSocketService";
 import { useUserStore } from "@/shared/store/userStore";
 import { formatTime } from "@/shared/utils/dateUtils";
 import GroupInfoScreen from "../components/GroupInfoScreen";
+import ChatOptionsScreen from "./ChatOptionsScreen";
+import { useChatStore } from "@/shared/store/useChatStore";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function ChatScreen() {
     const route = useRoute<any>();
+    const router = useRouter();
     const { id, name, type } = route.params || {};
     const roomId = typeof id === "string" ? id : "";
     const displayName = typeof name === "string" ? name : "Người dùng";
@@ -24,7 +28,9 @@ export default function ChatScreen() {
     const [loaded, setLoaded] = useState(false);
     const flatListRef = useRef<FlatList>(null);
     const [showGroupInfo, setShowGroupInfo] = useState(false);
+    const [showChatOptions, setShowChatOptions] = useState(false);
     const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+    const slideOptionsAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
 
     const openGroupInfo = () => {
         setShowGroupInfo(true);
@@ -43,6 +49,23 @@ export default function ChatScreen() {
         }).start(() => setShowGroupInfo(false));
     };
 
+    const openChatOptions = () => {
+        setShowChatOptions(true);
+        Animated.spring(slideOptionsAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 0,
+        }).start();
+    };
+
+    const closeChatOptions = () => {
+        Animated.timing(slideOptionsAnim, {
+            toValue: SCREEN_WIDTH,
+            duration: 250,
+            useNativeDriver: true,
+        }).start(() => setShowChatOptions(false));
+    };
+
     const currentUserId = useUserStore((s) => s.profile?.id);
 
     // ─── Load chat history ───
@@ -59,6 +82,16 @@ export default function ChatScreen() {
         } finally {
             setLoaded(true);
         }
+    }, [roomId]);
+
+    // ─── Reset Unread Count via Store ───
+    useEffect(() => {
+        if (roomId) {
+            useChatStore.getState().setCurrentRoom(roomId as string);
+        }
+        return () => {
+            useChatStore.getState().setCurrentRoom(null);
+        };
     }, [roomId]);
 
     // ─── WebSocket: subscribe to room for realtime ───
@@ -174,6 +207,8 @@ export default function ChatScreen() {
                 onMenuPress={() => {
                     if (roomType === "GROUP") {
                         openGroupInfo();
+                    } else {
+                        openChatOptions();
                     }
                 }}
             />
@@ -194,6 +229,28 @@ export default function ChatScreen() {
                     <GroupInfoScreen
                         roomId={roomId}
                         onClose={closeGroupInfo}
+                    />
+                </Animated.View>
+            )}
+
+            {/* Chat Options (Personal) - Slide from right */}
+            {showChatOptions && (
+                <Animated.View
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 100,
+                        transform: [{ translateX: slideOptionsAnim }],
+                    }}
+                >
+                    <ChatOptionsScreen
+                        roomId={roomId}
+                        name={displayName}
+                        avatarUrl={useChatStore.getState().rooms.find(r => r.id === roomId)?.avatarUrl || undefined}
+                        onClose={closeChatOptions}
                     />
                 </Animated.View>
             )}

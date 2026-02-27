@@ -291,7 +291,8 @@ export default function ContactsMobileScreen() {
                                 paddingVertical: 0,
                             }}
                             showSoftInputOnFocus={false}
-                            onFocus={() => {
+                            onFocus={(e) => {
+                                e.target.blur();
                                 // Mở màn tìm kiếm chung và focus input bên đó
                                 router.push("/(tabs)/contacts-search");
                                 // Xóa text cũ để lần sau vào lại luôn sạch

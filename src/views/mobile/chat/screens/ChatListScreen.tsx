@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef } from "react";
-import { View, FlatList, ActivityIndicator, Text, RefreshControl, Animated } from "react-native";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { View, FlatList, ActivityIndicator, Text, RefreshControl, Animated, AppState } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { ChatListHeader } from "../components/ChatListHeader";
@@ -8,12 +8,16 @@ import { ChatItem } from "../components/ChatItem";
 import { chatService, ChatRoomResponse } from "@/shared/services/chatService";
 import { formatTime } from "@/shared/utils/dateUtils";
 import { Ionicons } from "@expo/vector-icons";
+import { PROFILE_COLORS } from "../../profile/styles";
+import { webSocketService } from "@/shared/services/WebSocketService";
+import { useChatStore } from "@/shared/store/useChatStore";
 
 export default function ChatListScreen() {
     const router = useRouter();
-    const [chats, setChats] = useState<ChatRoomResponse[]>([]);
+    const { rooms, setRooms, addMessage } = useChatStore();
     const [refreshing, setRefreshing] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const subscribedRooms = useRef<Set<string>>(new Set());
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
@@ -28,8 +32,43 @@ export default function ChatListScreen() {
         try {
             if (showLoading && !hasLoadedOnce.current) setLoading(true);
             setError(null);
+
+            // Lấy danh sách từ API
             const data = await chatService.getChatRooms();
-            setChats(data);
+            const existingRooms = useChatStore.getState().rooms;
+
+            // Map sang ChatRoom interface của store (giống Web)
+            const storeRooms = data.map((r) => {
+                const existing = existingRooms.find(er => er.id === r.id);
+                return {
+                    id: r.id,
+                    name: r.name || 'Người dùng',
+                    avatarUrl: r.avatarUrl || undefined,
+                    type: r.type === 'DIRECT' ? 'PRIVATE' as const : 'GROUP' as const,
+                    lastMessage: r.lastMessage
+                        ? {
+                            id: r.lastMessage.messageId,
+                            senderId: r.lastMessage.senderId,
+                            roomId: r.id,
+                            content: r.lastMessage.content,
+                            type: (r.lastMessage.type as any) || 'TEXT',
+                            createdAt: r.lastMessage.createdAt,
+                        }
+                        : undefined,
+                    unreadCount: Math.max(existing ? existing.unreadCount : 0, r.unreadCount || 0),
+                    participants: (r.members || []).map((m: any) => ({
+                        id: m.user?.id || m.id || '',
+                        username: m.user?.username || m.username || '',
+                        fullName: m.user?.displayName || m.user?.fullName || m.displayName || m.fullName || '',
+                        avatarUrl: m.user?.avatarUrl || m.avatarUrl || undefined,
+                    })),
+                    updatedAt: r.lastMessage?.createdAt || r.createdAt || new Date().toISOString(),
+                };
+            });
+
+            storeRooms.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+            setRooms(storeRooms);
+
             hasLoadedOnce.current = true;
             // Fade in animation
             Animated.timing(fadeAnim, {
@@ -39,7 +78,7 @@ export default function ChatListScreen() {
             }).start();
         } catch (err: any) {
             console.log("Error fetching chats:", err);
-            if (chats.length === 0) {
+            if (rooms.length === 0) {
                 setError(err.message || "Failed to fetch chats");
             }
         } finally {
@@ -47,21 +86,63 @@ export default function ChatListScreen() {
         }
     };
 
-    // Auto-fetch when screen is focused
+    // Subscribe to WebSocket for each chat room to get real-time updates & unread counts
+    useEffect(() => {
+        if (rooms.length === 0) return;
+
+        // Activate WebSocket if not active
+        webSocketService.activate();
+
+        rooms.forEach((room) => {
+            if (subscribedRooms.current.has(room.id)) return;
+
+            const topic = `/topic/chat/${room.id}`;
+            webSocketService.subscribe(topic, (stompMsg) => {
+                try {
+                    const dynamo = JSON.parse(stompMsg.body);
+                    const incoming = {
+                        id: dynamo.messageId,
+                        senderId: dynamo.senderId,
+                        senderName: dynamo.senderName || undefined,
+                        roomId: room.id,
+                        content: dynamo.recalled ? '[Tin nhắn đã thu hồi]' : dynamo.content,
+                        type: (dynamo.type as any) || 'TEXT',
+                        createdAt: dynamo.createdAt,
+                        readBy: dynamo.readBy,
+                    };
+
+                    // addMessage trong store sẽ tự động cập nhật tin nhắn cuối, thời gian, VÀ unreadCount!
+                    useChatStore.getState().addMessage(room.id, incoming);
+                } catch (err) {
+                    console.error('Lỗi parse tin nhắn WS:', err);
+                }
+            });
+            subscribedRooms.current.add(room.id);
+        });
+
+        return () => {
+            // Không dọn dẹp subscription khi navigate qua ChatScreen, chỉ dọn khi unmount hẳn App
+            // WebChatLayout cũng giữ subscription
+        };
+    }, [rooms.length]);
+
+    // Auto-fetch when screen is focused + poll every 10s as fallback
     useFocusEffect(
         useCallback(() => {
             fetchChats(true);
 
-            // Auto-refresh every 30 seconds while focused (background, no loading)
+            // Xóa currentRoomId khi ở màn hình danh sách (để store biết đang ở ngoài, tăng unreadCount bình thường)
+            useChatStore.getState().setCurrentRoom(null);
+
             const interval = setInterval(() => {
                 fetchChats(false);
-            }, 30000);
+            }, 10000);
 
             return () => clearInterval(interval);
         }, [])
     );
 
-    const renderItem = ({ item, index }: { item: ChatRoomResponse; index: number }) => {
+    const renderItem = ({ item, index }: { item: any; index: number }) => {
         const avatarUri = item.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || "User")}&background=random&color=fff`;
         const lastMsg = item.lastMessage?.content
             ? (item.lastMessage.type === 'IMAGE' ? '[Hình ảnh]' : item.lastMessage.type === 'FILE' ? '[Tập tin]' : item.lastMessage.content)
@@ -70,8 +151,6 @@ export default function ChatListScreen() {
         let timeDisplay = "";
         if (item.lastMessage?.createdAt) {
             timeDisplay = formatTime(item.lastMessage.createdAt);
-        } else if (item.createdAt) {
-            timeDisplay = formatTime(item.createdAt);
         }
 
         return (
@@ -90,23 +169,23 @@ export default function ChatListScreen() {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#0c0c15ff' }}>
+        <View style={{ flex: 1, backgroundColor: PROFILE_COLORS.background }}>
             <ChatListHeader />
-            {loading ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c0c15' }}>
+            {loading && rooms.length === 0 ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PROFILE_COLORS.background }}>
                     <ActivityIndicator size="large" color="#0068FF" />
                     <Text style={{ color: '#7f8c8d', marginTop: 12, fontSize: 13 }}>Đang tải tin nhắn...</Text>
                 </View>
-            ) : error ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c0c15', paddingHorizontal: 32 }}>
+            ) : error && rooms.length === 0 ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PROFILE_COLORS.background, paddingHorizontal: 32 }}>
                     <Ionicons name="cloud-offline-outline" size={48} color="#555" />
                     <Text style={{ color: '#e74c3c', marginTop: 12, fontSize: 15, fontWeight: '500' }}>Không thể tải danh sách tin nhắn</Text>
                     <Text style={{ color: '#7f8c8d', fontSize: 12, marginTop: 4 }}>{error}</Text>
                     <Text style={{ color: '#3498db', marginTop: 16, fontSize: 14, fontWeight: '500' }} onPress={onRefresh}>Thử lại</Text>
                 </View>
-            ) : chats.length === 0 ? (
+            ) : rooms.length === 0 ? (
                 <FlatList
-                    contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c0c15' }}
+                    contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PROFILE_COLORS.background }}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -127,7 +206,7 @@ export default function ChatListScreen() {
                 />
             ) : (
                 <FlatList
-                    data={chats}
+                    data={rooms}
                     keyExtractor={(item) => item.id}
                     refreshControl={
                         <RefreshControl

@@ -45,7 +45,7 @@ export default function GlobalSearchMobileScreen() {
                 }}
             >
                 <TouchableOpacity
-                    onPress={() => router.replace("/(tabs)/contacts")}
+                    onPress={() => router.back()}
                     style={{ padding: 4, marginRight: 8 }}
                     activeOpacity={0.8}
                 >
