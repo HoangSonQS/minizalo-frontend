@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Box } from 'zmp-ui';
 import ChatRoomList from './ChatRoomList';
+import CreateGroupModal from './CreateGroupModal';
 import { useChatStore } from '@/shared/store/useChatStore';
+import { useGroupStore } from '@/shared/store/useGroupStore';
 import { ChatRoom } from '@/shared/types';
 import { chatService, ChatRoomResponse } from '@/shared/services/chatService';
 import { useAuthStore } from '@/shared/store/authStore';
@@ -16,6 +18,8 @@ interface WebChatLayoutProps {
 const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId, onSelectRoom }) => {
     const { rooms, setRooms } = useChatStore();
     const { accessToken } = useAuthStore();
+    const { openCreateGroup } = useGroupStore();
+
     // Track which room IDs we've already subscribed to, to avoid re-subscribing
     const subscribedRoomIds = useRef<Set<string>>(new Set());
 
@@ -68,12 +72,12 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
         webSocketService.activate(accessToken);
     }, [accessToken]);
 
-    // Subscribe tới các phòng mới (chỉ subscribe 1 lần mỗi phòng, không unsubscribe khi rooms thay đổi)
+    // Subscribe tới các phòng mới (chỉ subscribe 1 lần mỗi phòng)
     useEffect(() => {
         if (rooms.length === 0) return;
 
         rooms.forEach((room) => {
-            if (subscribedRoomIds.current.has(room.id)) return; // Đã subscribe rồi, bỏ qua
+            if (subscribedRoomIds.current.has(room.id)) return;
 
             const topic = `/topic/chat/${room.id}`;
             const roomId = room.id;
@@ -91,7 +95,6 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
                         createdAt: dynamo.createdAt,
                         readBy: dynamo.readBy,
                     };
-                    console.log('[Global WS] Message received room:', roomId, incoming);
                     useChatStore.getState().addMessage(roomId, incoming);
                 } catch (err) {
                     console.error('Lỗi parse tin nhắn global WS:', err);
@@ -99,12 +102,10 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
             });
 
             subscribedRoomIds.current.add(room.id);
-            console.log('[Global WS] Subscribed to room:', room.id);
         });
 
-        // Cleanup chỉ khi component unmount hoàn toàn
         return () => {};
-    }, [rooms.length]); // Chỉ chạy lại khi số lượng phòng thay đổi (thêm phòng mới)
+    }, [rooms.length]);
 
     // Cleanup khi unmount hoàn toàn
     useEffect(() => {
@@ -120,9 +121,23 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
         <div className="flex h-screen bg-white">
             {/* Sidebar */}
             <div className="w-[350px] flex flex-col border-r border-gray-200">
-                <div className="h-12 flex items-center px-4 border-b border-gray-200 bg-white shadow-sm shrink-0">
+                {/* Header sidebar */}
+                <div className="h-12 flex items-center justify-between px-4 border-b border-gray-200 bg-white shadow-sm shrink-0">
                     <span className="font-bold text-lg">Tin nhắn</span>
+
+                    {/* Nút tạo nhóm */}
+                    <button
+                        onClick={openCreateGroup}
+                        title="Tạo nhóm mới"
+                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round"
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
                 </div>
+
                 <Box className="flex-1 overflow-hidden">
                     <ChatRoomList
                         rooms={rooms}
@@ -133,9 +148,12 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col bg-gray-50">
+            <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
                 {children}
             </div>
+
+            {/* Create Group Modal — global, luôn render */}
+            <CreateGroupModal />
         </div>
     );
 };
