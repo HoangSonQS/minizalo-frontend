@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Redirect } from "expo-router";
 import { useAuthStore } from "@/shared/store/authStore";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { userService } from "@/shared/services/userService";
 
 type AuthGuardMode = "requireAuth" | "guestOnly";
 
@@ -23,7 +24,7 @@ export function AuthGuard({
     loginPath = "/(auth)/login",
     homePath = "/(tabs)",
 }: AuthGuardProps) {
-    const { accessToken, refreshToken, isHydrated, refreshAuth, clear } = useAuthStore();
+    const { accessToken, refreshToken, isHydrated, refreshAuth, clear, user, setUser } = useAuthStore();
     const [isValidating, setIsValidating] = useState(false);
     const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
 
@@ -35,7 +36,22 @@ export function AuthGuard({
                 try {
                     const success = await refreshAuth();
                     setIsTokenValid(success);
-                    if (!success) {
+                    if (success) {
+                        // Fetch user profile if not already loaded
+                        if (!user) {
+                            try {
+                                const profile = await userService.getProfile();
+                                setUser({
+                                    id: profile.id,
+                                    username: profile.username,
+                                    fullName: profile.displayName || profile.username,
+                                    avatarUrl: profile.avatarUrl || undefined,
+                                });
+                            } catch {
+                                // Profile fetch failed but auth is still valid
+                            }
+                        }
+                    } else {
                         clear(); // Clear invalid tokens
                     }
                 } catch {
@@ -49,6 +65,7 @@ export function AuthGuard({
         };
         validateToken();
     }, [isHydrated, refreshToken]);
+
 
     // Show loading while hydrating or validating
     if (!isHydrated || (refreshToken && isValidating)) {

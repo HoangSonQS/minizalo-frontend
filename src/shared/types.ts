@@ -39,6 +39,7 @@ export interface PinMessageRequest {
 export interface Message {
     id: string;
     senderId: string;
+    senderName?: string;
     roomId: string;
     content: string;
     type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'STICKER' | 'REPLY' | 'FORWARD';
@@ -78,4 +79,21 @@ export interface ChatRoom {
     unreadCount: number;
     participants: User[];
     updatedAt: string;
+}
+
+export type GroupRole = 'ADMIN' | 'MEMBER';
+
+export interface GroupMember {
+    userId: string;
+    username: string;
+    avatarUrl?: string;
+    role: GroupRole;
+}
+
+export interface GroupDetail {
+    id: string;
+    groupName: string;
+    ownerId: string;
+    createdAt: string;
+    members: GroupMember[];
 }

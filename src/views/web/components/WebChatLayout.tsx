@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box } from 'zmp-ui';
 import ChatRoomList from './ChatRoomList';
+import CreateGroupModal from './CreateGroupModal';
 import { useChatStore } from '@/shared/store/useChatStore';
-import { ChatRoom, Message } from '@/shared/types';
-import friendService from '@/shared/services/friendService';
-import { groupService } from '@/shared/services/groupService';
+import { useGroupStore } from '@/shared/store/useGroupStore';
+import { ChatRoom } from '@/shared/types';
+import { chatService, ChatRoomResponse } from '@/shared/services/chatService';
 import { useAuthStore } from '@/shared/store/authStore';
 import { webSocketService } from '@/shared/services/WebSocketService';
 
@@ -15,194 +16,144 @@ interface WebChatLayoutProps {
 }
 
 const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId, onSelectRoom }) => {
-    const { rooms, setRooms, upsertRoom, addMessage } = useChatStore();
-    const { accessToken, user } = useAuthStore();
-    const currentUserId = user?.id || '';
-    const [groupIds, setGroupIds] = React.useState<string[]>([]);
+    const { rooms, setRooms } = useChatStore();
+    const { accessToken } = useAuthStore();
+    const { openCreateGroup } = useGroupStore();
 
+    // Track which room IDs we've already subscribed to, to avoid re-subscribing
+    const subscribedRoomIds = useRef<Set<string>>(new Set());
+
+    // Load danh sách phòng chat từ backend
     useEffect(() => {
         const fetchData = async () => {
             if (!accessToken) return;
-            if (rooms.length > 0) return; // Prevent refetching if already active
-
             try {
-                const [friends, groups] = await Promise.all([
-                    friendService.getFriends(),
-                    groupService.getUsersGroups()
-                ]);
-
-                setGroupIds(groups.map(g => g.id));
-
-                console.log('Current User ID:', currentUserId);
-                console.log('Raw Friends Data:', friends);
-
-                const friendRooms: ChatRoom[] = friends.map(f => {
-                    // Identify the 'other' user in the relationship
-                    let otherUser = f.friend;
-                    if (f.user.id === currentUserId) {
-                        otherUser = f.friend;
-                    } else if (f.friend.id === currentUserId) {
-                        otherUser = f.user;
-                    } else {
-                        // Fallback or error case: neither matches current user
-                        // This might happen if the data is stale or malformed
-                        console.warn('Friend record does not contain current user:', f);
-                        otherUser = f.friend; // Default to friend
-                    }
-                    
+                const data: ChatRoomResponse[] = await chatService.getChatRooms();
+                const existingRooms = useChatStore.getState().rooms;
+                const allRooms: ChatRoom[] = data.map((r) => {
+                    const existing = existingRooms.find(er => er.id === r.id);
                     return {
-                        id: otherUser.id,
-                        name: otherUser.displayName || otherUser.username,
-                        avatarUrl: otherUser.avatarUrl || undefined,
-                        type: 'PRIVATE',
-                        unreadCount: 0,
-                        participants: [{
-                            id: otherUser.id,
-                            username: otherUser.username,
-                            fullName: otherUser.displayName || otherUser.username,
-                            avatarUrl: otherUser.avatarUrl || undefined
-                        }],
-                        updatedAt: new Date().toISOString(),
+                        id: r.id,
+                        name: r.name || 'Người dùng',
+                        avatarUrl: r.avatarUrl || undefined,
+                        type: r.type === 'DIRECT' ? 'PRIVATE' : 'GROUP',
+                        lastMessage: r.lastMessage
+                            ? {
+                                  id: r.lastMessage.messageId,
+                                  senderId: r.lastMessage.senderId,
+                                  roomId: r.id,
+                                  content: r.lastMessage.content,
+                                  type: (r.lastMessage.type as any) || 'TEXT',
+                                  createdAt: r.lastMessage.createdAt,
+                              }
+                            : undefined,
+                        unreadCount: Math.max(existing ? existing.unreadCount : 0, r.unreadCount || 0),
+                        participants: (r.members || []).map((m: any) => ({
+                            id: m.user?.id || m.id || '',
+                            username: m.user?.username || m.username || '',
+                            fullName: m.user?.displayName || m.user?.fullName || m.displayName || m.fullName || '',
+                            avatarUrl: m.user?.avatarUrl || m.avatarUrl || undefined,
+                        })),
+                        updatedAt: r.lastMessage?.createdAt || r.createdAt || new Date().toISOString(),
                     };
                 });
-
-                const groupRooms: ChatRoom[] = groups.map(g => ({
-                    id: g.id,
-                    name: g.name,
-                    avatarUrl: g.avatarUrl || undefined,
-                    type: 'GROUP',
-                    unreadCount: 0,
-                    participants: [], // TODO: We might need to fetch participants if not available
-                    updatedAt: new Date().toISOString(),
-                }));
-
-                const allRooms = [...friendRooms, ...groupRooms].sort((a, b) => 
-                    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-                );
-
+                allRooms.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
                 setRooms(allRooms);
             } catch (error) {
-                console.error("Failed to fetch chat rooms", error);
+                console.error('Failed to fetch chat rooms', error);
             }
         };
-
         fetchData();
     }, [accessToken]);
 
+    // Activate WebSocket khi có token
     useEffect(() => {
         if (!accessToken) return;
-
         webSocketService.activate(accessToken);
+    }, [accessToken]);
 
-        const handlePrivateMessage = (message: any) => {
-            const msgBody: Message = JSON.parse(message.body);
-            handleIncomingMessage(msgBody, false);
-        };
+    // Subscribe tới các phòng mới (chỉ subscribe 1 lần mỗi phòng)
+    useEffect(() => {
+        if (rooms.length === 0) return;
 
-        const handleGroupMessage = (message: any) => {
-            const msgBody: Message = JSON.parse(message.body);
-            handleIncomingMessage(msgBody, true);
-        };
+        rooms.forEach((room) => {
+            if (subscribedRoomIds.current.has(room.id)) return;
 
-        if (currentUserId) {
-             webSocketService.subscribe(`/topic/private.chat.${currentUserId}`, handlePrivateMessage);
-        }
+            const topic = `/topic/chat/${room.id}`;
+            const roomId = room.id;
 
-        // Subscribe to groups
-        groupIds.forEach(groupId => {
-            webSocketService.subscribe(`/topic/group.chat.${groupId}`, handleGroupMessage);
+            webSocketService.subscribe(topic, (stompMsg) => {
+                try {
+                    const dynamo = JSON.parse(stompMsg.body);
+                    const incoming = {
+                        id: dynamo.messageId,
+                        senderId: dynamo.senderId,
+                        senderName: dynamo.senderName || undefined,
+                        roomId: roomId,
+                        content: dynamo.recalled ? '[Tin nhắn đã thu hồi]' : dynamo.content,
+                        type: (dynamo.type as any) || 'TEXT',
+                        createdAt: dynamo.createdAt,
+                        readBy: dynamo.readBy,
+                    };
+                    useChatStore.getState().addMessage(roomId, incoming);
+                } catch (err) {
+                    console.error('Lỗi parse tin nhắn global WS:', err);
+                }
+            });
+
+            subscribedRoomIds.current.add(room.id);
         });
 
-        return () => {
-            if (currentUserId) {
-                webSocketService.unsubscribe(`/topic/private.chat.${currentUserId}`);
-            }
-             groupIds.forEach(groupId => {
-                webSocketService.unsubscribe(`/topic/group.chat.${groupId}`);
-            });
-        };
-    }, [accessToken, currentUserId, groupIds]); // Re-subscribe if groups change
+        return () => {};
+    }, [rooms.length]);
 
-    const handleIncomingMessage = (message: Message, isGroup: boolean) => {
-        // Access latest rooms state directly to avoid stale closures
-        const currentRooms = useChatStore.getState().rooms;
-
-        let targetRoomId = message.roomId;
-        let roomType: 'PRIVATE' | 'GROUP' = 'PRIVATE';
-
-        if (isGroup) {
-            targetRoomId = message.roomId;
-            roomType = 'GROUP';
-        } else {
-             // For private, use senderId if received from someone else
-             if (message.senderId !== currentUserId) {
-                 targetRoomId = message.senderId;
-             } else {
-                 // Self-sent message (echo), use receiverId
-                 targetRoomId = message.receiverId; // This assumes receiverId is the friend ID
-             }
-        }
-        
-        const existingRoom = currentRooms.find(r => r.id === targetRoomId);
-        
-        // Calculate unread count. If current room is open, don't increment?
-        // Actually, selectedRoomId might be null or different.
-        // We need access to selectedRoomId prop here. 
-        // But handleIncomingMessage is defined in component scope, so it should access props.
-        // Wait, props in callback will be stale if useEffect doesn't update.
-        // useEffect depends on groupIds, so handleIncomingMessage is recreated.
-        // BUT selectedRoomId changes often. We don't want to re-subscribe often.
-        // The callback closes over 'selectedRoomId'.
-        // So we need a ref for selectedRoomId?
-        // Or we pass selectedRoomId to the callback... but callback is registered once.
-        
-        // Solution: Use a ref for selectedRoomId
-        
-        const isCurrentRoom = targetRoomId === selectedRoomIdRef.current;
-        const newUnreadCount = isCurrentRoom ? 0 : (existingRoom ? existingRoom.unreadCount + 1 : 1);
-        
-        const roomUpdate: ChatRoom = {
-            id: targetRoomId,
-            name: existingRoom?.name || "New Chat", // Keep existing name or set placeholder
-            type: roomType,
-            lastMessage: message,
-            unreadCount: newUnreadCount,
-            participants: existingRoom?.participants || [],
-            updatedAt: message.createdAt,
-            avatarUrl: existingRoom?.avatarUrl
-        };
-        
-        upsertRoom(roomUpdate);
-        addMessage(targetRoomId, message);
-    };
-
-    // Ref to track selectedRoomId for use inside callbacks
-    const selectedRoomIdRef = React.useRef(selectedRoomId);
+    // Cleanup khi unmount hoàn toàn
     useEffect(() => {
-        selectedRoomIdRef.current = selectedRoomId;
-    }, [selectedRoomId]);
+        return () => {
+            subscribedRoomIds.current.forEach(roomId => {
+                webSocketService.unsubscribe(`/topic/chat/${roomId}`);
+            });
+            subscribedRoomIds.current.clear();
+        };
+    }, []);
 
     return (
         <div className="flex h-screen bg-white">
             {/* Sidebar */}
             <div className="w-[350px] flex flex-col border-r border-gray-200">
-                <div className="h-12 flex items-center px-4 border-b border-gray-200 bg-white shadow-sm shrink-0">
-                    {/* Reimplement header logic or passing 'Tin nhắn' text/search bar */}
+                {/* Header sidebar */}
+                <div className="h-12 flex items-center justify-between px-4 border-b border-gray-200 bg-white shadow-sm shrink-0">
                     <span className="font-bold text-lg">Tin nhắn</span>
+
+                    {/* Nút tạo nhóm */}
+                    <button
+                        onClick={openCreateGroup}
+                        title="Tạo nhóm mới"
+                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round"
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
                 </div>
+
                 <Box className="flex-1 overflow-hidden">
-                    <ChatRoomList 
-                        rooms={rooms} 
-                        selectedRoomId={selectedRoomId} 
+                    <ChatRoomList
+                        rooms={rooms}
+                        selectedRoomId={selectedRoomId}
                         onSelectRoom={onSelectRoom}
                     />
                 </Box>
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col bg-gray-50">
+            <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
                 {children}
             </div>
+
+            {/* Create Group Modal — global, luôn render */}
+            <CreateGroupModal />
         </div>
     );
 };

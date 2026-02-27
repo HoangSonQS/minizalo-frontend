@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "expo-router";
 import { useUserStore } from "@/shared/store/userStore";
 import { useAuthStore } from "@/shared/store/authStore";
+import { useChatStore } from "@/shared/store/useChatStore";
 import SettingsPanel from "./SettingsPanel";
 
 const SIDEBAR_BG = "#004A99";
@@ -65,6 +66,7 @@ export default function WebSidebar() {
     const [showSettingsPanel, setShowSettingsPanel] = useState(false);
     const hasToken = !!useAuthStore((s) => s.accessToken);
     const { profile, fetchProfile } = useUserStore();
+    const totalUnread = useChatStore((s) => s.rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0));
 
     useEffect(() => {
         if (hasToken && !profile) fetchProfile();
@@ -135,6 +137,7 @@ export default function WebSidebar() {
                 icon={iconMessage}
                 active={isActive("/(tabs)")}
                 onClick={() => router.push("/(tabs)")}
+                badge={totalUnread}
             />
 
             {/* Danh bạ */}
@@ -184,12 +187,14 @@ function NavItem({
     icon,
     active,
     onClick,
+    badge,
 }: {
     href: string;
     label: string;
     icon: React.ReactNode;
     active: boolean;
     onClick: () => void;
+    badge?: number;
 }) {
     return (
         <button
@@ -207,6 +212,7 @@ function NavItem({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                position: "relative",
             }}
             onMouseEnter={(e) => {
                 if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.1)";
@@ -216,6 +222,27 @@ function NavItem({
             }}
         >
             {icon}
+            {badge !== undefined && badge > 0 && (
+                <div style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    backgroundColor: "#ef4444",
+                    color: "#fff",
+                    borderRadius: "10px",
+                    minWidth: 16,
+                    height: 16,
+                    fontSize: 10,
+                    fontWeight: "bold",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 4px",
+                    pointerEvents: "none"
+                }}>
+                    {badge > 99 ? "99+" : badge}
+                </div>
+            )}
         </button>
     );
 }

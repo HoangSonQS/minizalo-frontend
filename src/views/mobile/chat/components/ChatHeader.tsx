@@ -1,14 +1,16 @@
 import React from "react";
-import { View, Text, TouchableOpacity, SafeAreaView, Platform, StatusBar } from "react-native";
-import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
+import { View, Text, TouchableOpacity, SafeAreaView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 interface ChatHeaderProps {
     name: string;
+    roomType?: string;
     onBack?: () => void;
+    onMenuPress?: () => void;
 }
 
-export default function ChatHeader({ name, onBack }: ChatHeaderProps) {
+export default function ChatHeader({ name, roomType, onBack, onMenuPress }: ChatHeaderProps) {
     const router = useRouter();
 
     const handleBack = () => {
@@ -20,32 +22,38 @@ export default function ChatHeader({ name, onBack }: ChatHeaderProps) {
     };
 
     return (
-        <View className="bg-[#1a1a1a] pt-0">
-            {/* Status bar spacer managed by SafeAreaView or manual padding if needed, 
-                but usually header height handles it. 
-                For Zalo style, the header is blue.
-            */}
-
+        <View style={{ backgroundColor: "#1a1a1a" }}>
             <SafeAreaView>
-                <View className="flex-row items-center justify-between px-3 h-[50px] space-x-2">
+                <View
+                    style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        paddingHorizontal: 12,
+                        height: 50,
+                    }}
+                >
                     {/* Left: Back & Name */}
-                    <View className="flex-row items-center flex-1">
-                        <TouchableOpacity onPress={handleBack} className="mr-2">
+                    <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                        <TouchableOpacity onPress={handleBack} style={{ marginRight: 8 }}>
                             <Ionicons name="chevron-back" size={28} color="white" />
                         </TouchableOpacity>
 
-                        <View className="flex-1">
-                            <Text className="text-white text-lg font-bold" numberOfLines={1}>
+                        <View style={{ flex: 1 }}>
+                            <Text
+                                style={{ color: "white", fontSize: 18, fontWeight: "bold" }}
+                                numberOfLines={1}
+                            >
                                 {name}
                             </Text>
-                            <Text className="text-blue-100 text-xs">
-                                Vừa mới truy cập
+                            <Text style={{ color: "#93c5fd", fontSize: 12 }}>
+                                {roomType === "GROUP" ? `Nhóm` : "Vừa mới truy cập"}
                             </Text>
                         </View>
                     </View>
 
                     {/* Right: Actions */}
-                    <View className="flex-row items-center space-x-7">
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
                         <TouchableOpacity>
                             <Ionicons name="call-outline" size={24} color="white" />
                         </TouchableOpacity>
@@ -54,7 +62,7 @@ export default function ChatHeader({ name, onBack }: ChatHeaderProps) {
                             <Ionicons name="videocam-outline" size={26} color="white" />
                         </TouchableOpacity>
 
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={onMenuPress}>
                             <Ionicons name="menu-outline" size={26} color="white" />
                         </TouchableOpacity>
                     </View>

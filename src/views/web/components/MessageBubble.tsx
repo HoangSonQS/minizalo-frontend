@@ -1,5 +1,4 @@
 import React from 'react';
-import { Box, Avatar, Text } from 'zmp-ui';
 import { Message } from '@/shared/types';
 import clsx from 'clsx';
 
@@ -7,48 +6,95 @@ interface MessageBubbleProps {
     message: Message;
     isMine: boolean;
     showAvatar?: boolean;
+    isFirstInGroup?: boolean;
+    isLastInGroup?: boolean;
     senderName?: string;
     senderAvatar?: string;
+    marginBottom?: string;
 }
+
+const getAvatarUrl = (name: string, avatarUrl?: string) => {
+    if (avatarUrl) return avatarUrl;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4A90D9&color=fff&size=64`;
+};
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
     message,
     isMine,
-    showAvatar = true,
+    showAvatar = false,
+    isFirstInGroup = true,
+    isLastInGroup = true,
     senderName,
-    senderAvatar
+    senderAvatar,
+    marginBottom = 'mb-1',
 }) => {
+    // Bo góc kiểu Zalo: góc liên kết với avatar phẳng, còn lại bo tròn
+    const bubbleRadius = isMine
+        ? clsx(
+            'rounded-2xl',
+            isFirstInGroup && 'rounded-tr-md',
+            isLastInGroup && 'rounded-br-md',
+          )
+        : clsx(
+            'rounded-2xl',
+            isFirstInGroup && 'rounded-tl-md',
+            isLastInGroup && 'rounded-bl-md',
+          );
+
+    const displayName = senderName || 'Unknown';
+
     return (
-        <Box className={clsx('flex flex-row mb-2', isMine ? 'justify-end' : 'justify-start')}>
-            {!isMine && showAvatar && (
-                <Box className="mr-2 self-end">
-                    <Avatar src={senderAvatar || 'https://via.placeholder.com/32'} size={32} />
-                </Box>
+        <div className={clsx('flex flex-row items-end', isMine ? 'justify-end' : 'justify-start', marginBottom)}>
+            {/* Avatar bên trái (người khác) */}
+            {!isMine && (
+                <div className="mr-1.5 self-end flex-shrink-0" style={{ width: 32 }}>
+                    {showAvatar ? (
+                        <img
+                            src={getAvatarUrl(displayName, senderAvatar)}
+                            alt={displayName}
+                            className="w-8 h-8 rounded-full object-cover"
+                        />
+                    ) : (
+                        <div className="w-8 h-8" /> /* placeholder để giữ alignment */
+                    )}
+                </div>
             )}
-            
-            <Box className={clsx('max-w-[70%] flex flex-col', isMine ? 'items-end' : 'items-start')}>
-                {!isMine && showAvatar && senderName && (
-                     <Text size="xxSmall" className="text-gray-500 mb-1 ml-1">{senderName}</Text>
+
+            {/* Bubble content */}
+            <div className={clsx('max-w-[65%] flex flex-col', isMine ? 'items-end' : 'items-start')}>
+                {/* Tên người gửi (hiện ở đầu nhóm) */}
+                {!isMine && senderName && (
+                    <span className="text-xs text-gray-500 mb-0.5 ml-1 font-medium">{senderName}</span>
                 )}
-                
-                <Box
+
+                {/* Nội dung tin nhắn */}
+                <div
                     className={clsx(
-                        'p-3 rounded-xl break-words',
-                        isMine ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-gray-200 text-black rounded-tl-none'
+                        'px-3 py-2 break-words',
+                        bubbleRadius,
+                        isMine
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-white text-gray-900 shadow-sm border border-gray-100'
                     )}
                 >
-                   {message.type === 'TEXT' ? (
-                        <Text className="text-sm">{message.content}</Text>
-                   ) : (
-                       <Text className="text-sm italic text-gray-400">[Unsupported message type]</Text>
-                   )}
-                </Box>
-                
-                <Text size="xxSmall" className="text-gray-400 mt-1 mx-1">
-                    {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-            </Box>
-        </Box>
+                    {message.type === 'TEXT' ? (
+                        <span className="text-sm leading-relaxed">{message.content}</span>
+                    ) : (
+                        <span className="text-sm italic text-gray-400">[Loại tin nhắn không hỗ trợ]</span>
+                    )}
+                </div>
+
+                {/* Thời gian (hiện ở cuối nhóm) */}
+                {isLastInGroup && (
+                    <span className={clsx('text-xs text-gray-400 mt-0.5', isMine ? 'mr-1' : 'ml-1')}>
+                        {new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                        })}
+                    </span>
+                )}
+            </div>
+        </div>
     );
 };
 
