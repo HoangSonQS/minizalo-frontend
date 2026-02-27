@@ -1,9 +1,15 @@
-import { Client, IMessage } from '@stomp/stompjs';
-import { useAuthStore } from '@/shared/store/authStore';
+import { Client, IMessage } from "@stomp/stompjs";
+import { useAuthStore } from "@/shared/store/authStore";
+import {
+    ChatMessageRequest,
+    TypingIndicatorRequest,
+    ReadReceiptRequest,
+} from "../types";
 
-// Build WebSocket URL from API URL
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';
-const WS_URL = API_URL.replace(/^http/, 'ws').replace(/\/api$/, '/ws-raw');
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080/api";
+const WS_URL = API_URL.replace(/^http/, "ws").replace(/\/api$/, "/ws-raw");
+
+console.log("WebSocketService initialized with URL:", WS_URL);
 
 class WebSocketService {
     private client: Client;
@@ -35,17 +41,18 @@ class WebSocketService {
                 const callback = this.pendingSubscriptions[dest];
                 const sub = this.client.subscribe(dest, callback);
                 this.subscriptions[dest] = sub;
-                console.log('📩 Subscribed (pending):', dest);
+                console.log('📩 Subscribed to:', dest);
             });
             this.pendingSubscriptions = {};
         };
 
         this.client.onStompError = (frame) => {
-            console.error('STOMP error:', frame.headers['message']);
+            console.error("Broker reported error: " + frame.headers["message"]);
+            console.error("Additional details: " + frame.body);
         };
 
         this.client.onWebSocketError = (event) => {
-            console.error('WebSocket error:', event);
+            console.error("Error with websocket", event);
         };
 
         this.client.onDisconnect = () => {
@@ -84,12 +91,13 @@ class WebSocketService {
 
     /** Check if connected */
     isConnected(): boolean {
-        return this.connected;
+        return this.connected && this.client.connected;
     }
 
     /** Subscribe to a topic/destination */
     subscribe(destination: string, callback: (message: IMessage) => void) {
         if (!this.client.connected) {
+            console.log("STOMP client not connected, queueing subscription to", destination);
             this.pendingSubscriptions[destination] = callback;
             return;
         }
@@ -107,34 +115,51 @@ class WebSocketService {
             this.subscriptions[destination].unsubscribe();
             delete this.subscriptions[destination];
         }
-        delete this.pendingSubscriptions[destination];
+        if (this.pendingSubscriptions[destination]) {
+            delete this.pendingSubscriptions[destination];
+        }
     }
 
-    /** Send a chat message via STOMP */
-    sendChatMessage(roomId: string, content: string) {
-        const body = JSON.stringify({
-            receiverId: roomId,
-            content,
+    /** Gửi tin nhắn chat qua WebSocket, trả về true nếu thành công */
+    sendChatMessage(receiverId: string, content: string, type: string = "TEXT"): boolean {
+        if (!this.client.connected) {
+            console.error("Cannot send message: STOMP not connected");
+            return false;
+        }
+        this.client.publish({
+            destination: "/app/chat.send",
+            body: JSON.stringify({ receiverId, content, type }),
         });
+        return true;
+    }
 
+    /** Gửi qua ChatMessageRequest đầy đủ */
+    sendMessage(request: ChatMessageRequest) {
         if (this.client.connected) {
             this.client.publish({
-                destination: '/app/chat.send',
-                body,
+                destination: "/app/chat.send",
+                body: JSON.stringify(request),
             });
-            return true;
+        } else {
+            console.error("Cannot send message: STOMP not connected");
         }
-
-        console.warn('WebSocket not connected, cannot send via STOMP');
-        return false;
     }
 
     /** Send typing indicator */
-    sendTyping({ roomId, isTyping }: { roomId: string; isTyping: boolean }) {
+    sendTyping(request: TypingIndicatorRequest) {
         if (this.client.connected) {
             this.client.publish({
-                destination: '/app/chat.typing',
-                body: JSON.stringify({ roomId, isTyping }),
+                destination: "/app/chat.typing",
+                body: JSON.stringify(request),
+            });
+        }
+    }
+
+    sendReadReceipt(request: ReadReceiptRequest) {
+        if (this.client.connected) {
+            this.client.publish({
+                destination: "/app/chat.read",
+                body: JSON.stringify(request),
             });
         }
     }

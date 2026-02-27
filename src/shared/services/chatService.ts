@@ -122,6 +122,7 @@ export const chatService = {
         const { data } = await api.post<MessageDynamo>("/chat/send", {
             receiverId: roomId,
             content,
+            type: 'TEXT',
         });
         return data;
     },

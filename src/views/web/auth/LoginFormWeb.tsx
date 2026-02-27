@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { Button, Input } from "zmp-ui";
 import { useAuthStore } from "@/shared/store/authStore";
+import { userService } from "@/shared/services/userService";
 
 const COLORS = {
     primary: "#0068FF",
@@ -15,6 +16,7 @@ const COLORS = {
 export default function LoginFormWeb() {
     const router = useRouter();
     const login = useAuthStore((s) => s.login);
+    const setUser = useAuthStore((s) => s.setUser);
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -37,6 +39,20 @@ export default function LoginFormWeb() {
                 username: username.trim(),
                 password,
             });
+
+            // Fetch user profile after login to get user id, display name, etc.
+            try {
+                const profile = await userService.getProfile();
+                setUser({
+                    id: profile.id,
+                    username: profile.username,
+                    fullName: profile.displayName || profile.username,
+                    avatarUrl: profile.avatarUrl || undefined,
+                });
+            } catch (profileErr) {
+                console.warn('Failed to fetch user profile after login:', profileErr);
+            }
+
             router.replace("/(tabs)");
         } catch (err: any) {
             const message =
@@ -47,6 +63,7 @@ export default function LoginFormWeb() {
             setLoading(false);
         }
     };
+
 
     return (
         <div
