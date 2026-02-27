@@ -80,3 +80,20 @@ export interface ChatRoom {
     participants: User[];
     updatedAt: string;
 }
+
+export type GroupRole = 'ADMIN' | 'MEMBER';
+
+export interface GroupMember {
+    userId: string;
+    username: string;
+    avatarUrl?: string;
+    role: GroupRole;
+}
+
+export interface GroupDetail {
+    id: string;
+    groupName: string;
+    ownerId: string;
+    createdAt: string;
+    members: GroupMember[];
+}
