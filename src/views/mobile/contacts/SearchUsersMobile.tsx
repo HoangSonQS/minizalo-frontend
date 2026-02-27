@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { PROFILE_COLORS } from "../profile/styles";
 import { searchService } from "@/shared/services/searchService";
@@ -17,21 +18,24 @@ import type { UserProfile } from "@/shared/services/types";
 
 type SearchUsersMobileProps = {
     initialQuery?: string;
+    autoFocus?: boolean;
 };
 
-export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobileProps) {
+export default function SearchUsersMobile({
+    initialQuery = "",
+    autoFocus = false,
+}: SearchUsersMobileProps) {
     const [query, setQuery] = useState(initialQuery);
     const [results, setResults] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { sendRequest, friends } = useFriendStore();
+    const { sendRequest, friends, sentRequests } = useFriendStore();
     const { profile } = useUserStore();
 
-    const [requestedIds, setRequestedIds] = useState<string[]>([]);
-
     const currentUserId = profile?.id ?? null;
+    const inputRef = useRef<TextInput | null>(null);
 
-    const friendIdSet = React.useMemo(() => {
+    const friendIdSet = useMemo(() => {
         const set = new Set<string>();
         if (!currentUserId) return set;
         friends.forEach((f) => {
@@ -43,6 +47,19 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
         });
         return set;
     }, [friends, currentUserId]);
+
+    // Tập userId mà mình đang gửi lời mời (PENDING) dựa trên sentRequests trong store
+    const pendingRequestIdSet = useMemo(() => {
+        const set = new Set<string>();
+        if (!currentUserId) return set;
+        sentRequests.forEach((fr) => {
+            // Với lời mời mình gửi: user = currentUser, friend = người nhận
+            if (fr.user.id === currentUserId) {
+                set.add(fr.friend.id);
+            }
+        });
+        return set;
+    }, [sentRequests, currentUserId]);
 
     const runSearch = async (value: string) => {
         const q = value.trim();
@@ -75,33 +92,60 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
     };
 
     const handleSendRequest = async (userId: string) => {
-        if (requestedIds.includes(userId) || friendIdSet.has(userId)) return;
+        // Đã là bạn hoặc đã có lời mời đang chờ thì không gửi thêm
+        if (friendIdSet.has(userId) || pendingRequestIdSet.has(userId)) return;
         try {
             await sendRequest(userId);
-            setRequestedIds((prev) =>
-                prev.includes(userId) ? prev : [...prev, userId]
-            );
             Alert.alert("Thành công", "Đã gửi lời mời kết bạn.");
         } catch {
             Alert.alert("Lỗi", "Gửi lời mời kết bạn thất bại.");
         }
     };
 
+    // Khi có initialQuery (từ thanh tìm kiếm chính), set lại query để effect bên dưới xử lý
     useEffect(() => {
         if (initialQuery.trim()) {
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            runSearch(initialQuery);
+            setQuery(initialQuery);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialQuery]);
+
+    // Tìm kiếm "theo từng ký tự" với debounce ngắn
+    useEffect(() => {
+        const q = query.trim();
+        if (!q) {
+            setResults([]);
+            setError(null);
+            return;
+        }
+        const timeoutId = setTimeout(() => {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            runSearch(q);
+        }, 350); // debounce ~0.35s
+
+        return () => clearTimeout(timeoutId);
+    }, [query]);
+
+    // Tự focus ô tìm kiếm khi màn này được hiển thị (khi autoFocus = true)
+    useFocusEffect(
+        useCallback(() => {
+            if (autoFocus && inputRef.current) {
+                // nhỏ delay để đảm bảo navigation đã hoàn tất trước khi focus
+                const id = setTimeout(() => {
+                    inputRef.current?.focus();
+                }, 50);
+                return () => clearTimeout(id);
+            }
+            return () => {};
+        }, [autoFocus])
+    );
 
     const renderItem = ({ item }: { item: UserProfile }) => {
         const displayName = item.displayName || item.username || "Người dùng";
         const initial =
             (displayName.charAt(0).toUpperCase() || "?").toUpperCase();
         const isSelf = currentUserId === item.id;
-        const isRequested = requestedIds.includes(item.id);
         const alreadyFriend = friendIdSet.has(item.id);
+        const isRequested = pendingRequestIdSet.has(item.id);
         const disabled = isSelf || isRequested || alreadyFriend;
         const label = isSelf
             ? ""
@@ -249,6 +293,7 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
                         style={{ marginRight: 6 }}
                     />
                     <TextInput
+                        ref={inputRef}
                         value={query}
                         onChangeText={setQuery}
                         placeholder="Nhập tên, số điện thoại hoặc email..."
@@ -259,9 +304,23 @@ export default function SearchUsersMobile({ initialQuery = "" }: SearchUsersMobi
                             fontSize: 14,
                             paddingVertical: 0,
                         }}
+                        autoFocus={autoFocus}
                         onSubmitEditing={handleSubmit}
                         returnKeyType="search"
                     />
+                    {query ? (
+                        <TouchableOpacity
+                            onPress={() => setQuery("")}
+                            style={{ paddingLeft: 4 }}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name="close-circle"
+                                size={18}
+                                color={PROFILE_COLORS.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
                 <TouchableOpacity
                     onPress={handleSubmit}

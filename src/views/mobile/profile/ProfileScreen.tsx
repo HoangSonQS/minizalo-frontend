@@ -80,7 +80,25 @@ export default function ProfileScreen({ user }: ProfileScreenProps) {
                         placeholderTextColor={PROFILE_COLORS.textSecondary}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
+                        showSoftInputOnFocus={false}
+                        onFocus={() => {
+                            router.push("/(tabs)/contacts-search");
+                            setSearchQuery("");
+                        }}
                     />
+                    {searchQuery ? (
+                        <TouchableOpacity
+                            onPress={() => setSearchQuery("")}
+                            style={{ paddingLeft: 4 }}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name="close-circle"
+                                size={18}
+                                color={PROFILE_COLORS.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
                 <TouchableOpacity
                     style={profileStyles.settingsButton}

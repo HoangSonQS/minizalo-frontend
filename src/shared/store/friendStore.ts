@@ -77,10 +77,13 @@ export const useFriendStore = create<FriendState>((set, get) => ({
     sendRequest: async (friendId: string) => {
         set({ error: null });
         try {
-            // Gửi lời mời: phía người gửi không cần thêm vào danh sách
-            // "Lời mời kết bạn" (danh sách đó dành cho các yêu cầu NHẬN được).
-            // Người nhận khi đăng nhập sẽ thấy request qua API /friends/requests.
-            await friendService.sendFriendRequest({ friendId });
+            // Gửi lời mời: backend trả về FriendResponseDto (request PENDING).
+            // Lưu lại vào sentRequests để các màn hình khác (Thêm bạn, Lời mời đã gửi...)
+            // có thể hiển thị trạng thái "Đã gửi" và cho phép hủy.
+            const created = await friendService.sendFriendRequest({ friendId });
+            set({
+                sentRequests: [...get().sentRequests, created],
+            });
         } catch (e: unknown) {
             set({
                 error: extractErrorMessage(e, "Gửi lời mời kết bạn thất bại."),
