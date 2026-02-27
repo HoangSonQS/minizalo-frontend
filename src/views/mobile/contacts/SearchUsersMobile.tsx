@@ -3,6 +3,7 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Keyboard,
     Text,
     TextInput,
     TouchableOpacity,
@@ -132,7 +133,8 @@ export default function SearchUsersMobile({
                 // nhỏ delay để đảm bảo navigation đã hoàn tất trước khi focus
                 const id = setTimeout(() => {
                     inputRef.current?.focus();
-                }, 50);
+                    Keyboard.show();
+                }, 80);
                 return () => clearTimeout(id);
             }
             return () => {};

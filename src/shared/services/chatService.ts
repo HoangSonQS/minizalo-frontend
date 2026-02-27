@@ -17,6 +17,11 @@ export interface Attachment {
     size: number;
 }
 
+export interface MessageReaction {
+    userId: string;
+    emoji: string;
+}
+
 export interface MessageDynamo {
     messageId: string;
     chatRoomId: string;
@@ -29,7 +34,7 @@ export interface MessageDynamo {
     replyToMessageId: string;
     read: boolean;
     readBy: string[];
-    reactions: any[]; // Define properly if needed
+    reactions: MessageReaction[];
     recalled: boolean;
     recalledAt: string;
     pinned: boolean;
@@ -118,12 +123,23 @@ export const chatService = {
         return data;
     },
 
-    sendMessage: async (roomId: string, content: string): Promise<MessageDynamo> => {
-        const { data } = await api.post<MessageDynamo>("/chat/send", {
+    getPinnedMessages: async (roomId: string, limit: number = 20, lastKey?: string): Promise<PaginatedMessageResult> => {
+        const params: any = { limit };
+        if (lastKey) params.lastKey = lastKey;
+        const { data } = await api.get<PaginatedMessageResult>(`/chat/${roomId}/pins`, { params });
+        return data;
+    },
+
+    sendMessage: async (roomId: string, content: string, replyToMessageId?: string): Promise<MessageDynamo> => {
+        const body: any = {
             receiverId: roomId,
             content,
-            type: 'TEXT',
-        });
+            type: "TEXT",
+        };
+        if (replyToMessageId) {
+            body.replyToMessageId = replyToMessageId;
+        }
+        const { data } = await api.post<MessageDynamo>("/chat/send", body);
         return data;
     },
 };

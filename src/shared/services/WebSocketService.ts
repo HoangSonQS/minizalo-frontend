@@ -4,6 +4,7 @@ import {
     ChatMessageRequest,
     TypingIndicatorRequest,
     ReadReceiptRequest,
+    PinMessageRequest,
 } from "../types";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080/api";
@@ -121,14 +122,27 @@ class WebSocketService {
     }
 
     /** Gửi tin nhắn chat qua WebSocket, trả về true nếu thành công */
-    sendChatMessage(receiverId: string, content: string, type: string = "TEXT"): boolean {
+    sendChatMessage(
+        receiverId: string,
+        content: string,
+        type: string = "TEXT",
+        replyToMessageId?: string
+    ): boolean {
         if (!this.client.connected) {
             console.error("Cannot send message: STOMP not connected");
             return false;
         }
+        const body: ChatMessageRequest = {
+            receiverId,
+            content,
+            type: type as any,
+        };
+        if (replyToMessageId) {
+            body.replyToMessageId = replyToMessageId;
+        }
         this.client.publish({
             destination: "/app/chat.send",
-            body: JSON.stringify({ receiverId, content, type }),
+            body: JSON.stringify(body),
         });
         return true;
     }
@@ -161,6 +175,17 @@ class WebSocketService {
                 destination: "/app/chat.read",
                 body: JSON.stringify(request),
             });
+        }
+    }
+
+    sendPin(request: PinMessageRequest) {
+        if (this.client.connected) {
+            this.client.publish({
+                destination: "/app/chat.pin",
+                body: JSON.stringify(request),
+            });
+        } else {
+            console.error("Cannot send pin: STOMP not connected");
         }
     }
 }

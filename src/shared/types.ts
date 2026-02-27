@@ -8,8 +8,10 @@ export interface User {
 export interface ChatMessageRequest {
     receiverId: string;
     content: string;
-    type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'STICKER' | 'REPLY' | 'FORWARD';
+    type: "TEXT" | "IMAGE" | "VIDEO" | "FILE" | "STICKER" | "REPLY" | "FORWARD";
     replyToId?: string;
+    // Field backend thực sự sử dụng cho reply
+    replyToMessageId?: string;
     fileUrl?: string;
 }
 
