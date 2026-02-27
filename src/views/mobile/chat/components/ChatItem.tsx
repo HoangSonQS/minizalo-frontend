@@ -14,38 +14,94 @@ interface ChatItemProps {
 
 export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified, onPress }: ChatItemProps) => {
     return (
-        <TouchableOpacity onPress={onPress} className="flex-row items-center bg-[#1a1a1a] px-4 py-2.5 active:bg-[#2a2a2a]">
+        <TouchableOpacity
+            onPress={onPress}
+            activeOpacity={0.7}
+            style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#0c0c15',
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+            }}
+        >
             {/* Avatar Container */}
-            <View className="relative mr-3">
-                <Image source={avatar} className="w-[52px] h-[52px] rounded-full bg-gray-700" resizeMode="cover" />
+            <View style={{ position: 'relative', marginRight: 12 }}>
+                <Image
+                    source={avatar}
+                    style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 26,
+                        backgroundColor: '#2d2d44',
+                    }}
+                    resizeMode="cover"
+                />
                 {isVerified && (
-                    <View className="absolute bottom-0 right-0 bg-[#1a1a1a] rounded-full p-[1.5px]">
-                        <View className="w-3 h-3 bg-[#1a1a1a] rounded-full items-center justify-center border border-gray-600">
-                            <Text className="text-[7px] font-bold text-yellow-500">v</Text>
+                    <View style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        backgroundColor: '#0c0c15',
+                        borderRadius: 999,
+                        padding: 1.5,
+                    }}>
+                        <View style={{
+                            width: 12,
+                            height: 12,
+                            backgroundColor: '#0c0c15',
+                            borderRadius: 999,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: '#555',
+                        }}>
+                            <Text style={{ fontSize: 7, fontWeight: 'bold', color: '#f1c40f' }}>v</Text>
                         </View>
                     </View>
                 )}
             </View>
 
             {/* Content Container */}
-            <View className="flex-1 border-b border-[#333] pb-2.5 justify-center h-[60px]">
+            <View style={{
+                flex: 1,
+                borderBottomWidth: 0.5,
+                borderBottomColor: '#2d2d44',
+                paddingBottom: 10,
+                justifyContent: 'center',
+                height: 60,
+            }}>
                 {/* Top Row: Name + Time */}
-                <View className="flex-row justify-between items-center mb-0.5">
-                    <View className="flex-row items-center flex-1 mr-2">
-                        <Text className="text-[16px] font-normal text-white" numberOfLines={1}>{name}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                        <Text style={{ fontSize: 16, color: '#e4e6eb', fontWeight: '400' }} numberOfLines={1}>{name}</Text>
                         {isVerified && (
-                            <View className="ml-1 bg-yellow-400 rounded-full w-3 h-3 justify-center items-center">
-                                <Text className="text-[8px] text-white">✓</Text>
+                            <View style={{
+                                marginLeft: 4,
+                                backgroundColor: '#f1c40f',
+                                borderRadius: 999,
+                                width: 12,
+                                height: 12,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                            }}>
+                                <Text style={{ fontSize: 8, color: 'white' }}>✓</Text>
                             </View>
                         )}
                     </View>
-                    <Text className="text-[12px] text-gray-400">{time}</Text>
+                    <Text style={{ fontSize: 12, color: '#7f8c8d' }}>{time}</Text>
                 </View>
 
                 {/* Bottom Row: Message + Badge */}
-                <View className="flex-row justify-between items-center">
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text
-                        className={`text-[14px] flex-1 mr-4 ${unreadCount && unreadCount > 0 ? 'text-gray-200 font-bold' : 'text-gray-500'}`}
+                        style={{
+                            fontSize: 14,
+                            flex: 1,
+                            marginRight: 16,
+                            color: unreadCount && unreadCount > 0 ? '#c8c9cc' : '#7f8c8d',
+                            fontWeight: unreadCount && unreadCount > 0 ? 'bold' : 'normal',
+                        }}
                         numberOfLines={1}
                         ellipsizeMode="tail"
                     >
@@ -53,8 +109,16 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
                     </Text>
 
                     {unreadCount && unreadCount > 0 ? (
-                        <View className="bg-red-500 rounded-full min-w-[16px] h-[16px] items-center justify-center px-1">
-                            <Text className="text-white text-[10px] font-bold">
+                        <View style={{
+                            backgroundColor: '#e74c3c',
+                            borderRadius: 999,
+                            minWidth: 18,
+                            height: 18,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingHorizontal: 4,
+                        }}>
+                            <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
                                 {unreadCount > 5 ? '5+' : unreadCount}
                             </Text>
                         </View>

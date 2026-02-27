@@ -112,6 +112,7 @@ export default function TabsLayout() {
                 <Tabs.Screen name="language" options={{ href: null }} />
                 <Tabs.Screen name="support" options={{ href: null }} />
                 <Tabs.Screen name="zalo-cloud" options={{ href: null }} />
+                <Tabs.Screen name="create-group" options={{ href: null }} />
             </Tabs>
         </AuthGuard>
     );

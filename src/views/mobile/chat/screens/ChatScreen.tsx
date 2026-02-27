@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { View, FlatList, Text, KeyboardAvoidingView, Platform } from "react-native";
+import { View, FlatList, Text, KeyboardAvoidingView, Platform, Animated, Dimensions } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import ChatHeader from "../components/ChatHeader";
 import ChatFooter from "../components/ChatFooter";
@@ -8,17 +8,40 @@ import { chatService, MessageDynamo } from "@/shared/services/chatService";
 import { webSocketService } from "@/shared/services/WebSocketService";
 import { useUserStore } from "@/shared/store/userStore";
 import { formatTime } from "@/shared/utils/dateUtils";
+import GroupInfoScreen from "../components/GroupInfoScreen";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function ChatScreen() {
     const route = useRoute<any>();
-    const { id, name } = route.params || {};
+    const { id, name, type } = route.params || {};
     const roomId = typeof id === "string" ? id : "";
     const displayName = typeof name === "string" ? name : "Người dùng";
+    const roomType = typeof type === "string" ? type : "DIRECT";
 
     const [messages, setMessages] = useState<MessageDynamo[]>([]);
     const [sending, setSending] = useState(false);
     const [loaded, setLoaded] = useState(false);
     const flatListRef = useRef<FlatList>(null);
+    const [showGroupInfo, setShowGroupInfo] = useState(false);
+    const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+
+    const openGroupInfo = () => {
+        setShowGroupInfo(true);
+        Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    const closeGroupInfo = () => {
+        Animated.timing(slideAnim, {
+            toValue: SCREEN_WIDTH,
+            duration: 250,
+            useNativeDriver: true,
+        }).start(() => setShowGroupInfo(false));
+    };
 
     const currentUserId = useUserStore((s) => s.profile?.id);
 
@@ -138,14 +161,42 @@ export default function ChatScreen() {
                 senderName={item.senderName}
                 time={timeDisplay}
                 isMe={isMe}
-                showSenderName={false}
+                showSenderName={roomType === "GROUP"}
             />
         );
     };
 
     return (
         <View className="flex-1 bg-[#0e0e0e]">
-            <ChatHeader name={displayName} />
+            <ChatHeader
+                name={displayName}
+                roomType={roomType}
+                onMenuPress={() => {
+                    if (roomType === "GROUP") {
+                        openGroupInfo();
+                    }
+                }}
+            />
+
+            {/* Group Info - Slide from right */}
+            {showGroupInfo && (
+                <Animated.View
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 100,
+                        transform: [{ translateX: slideAnim }],
+                    }}
+                >
+                    <GroupInfoScreen
+                        roomId={roomId}
+                        onClose={closeGroupInfo}
+                    />
+                </Animated.View>
+            )}
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
