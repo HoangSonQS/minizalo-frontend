@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
     View,
     FlatList,
@@ -12,6 +12,7 @@ import {
     Alert,
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import ChatHeader from "../components/ChatHeader";
 import ChatFooter from "../components/ChatFooter";
 import MessageBubble from "../components/MessageBubble";
@@ -21,11 +22,14 @@ import { webSocketService } from "@/shared/services/WebSocketService";
 import { useUserStore } from "@/shared/store/userStore";
 import { formatTime } from "@/shared/utils/dateUtils";
 import GroupInfoScreen from "../components/GroupInfoScreen";
+import ChatOptionsScreen from "./ChatOptionsScreen";
+import { useChatStore } from "@/shared/store/useChatStore";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function ChatScreen() {
     const route = useRoute<any>();
+    const router = useRouter();
     const { id, name, type } = route.params || {};
     const roomId = typeof id === "string" ? id : "";
     const displayName = typeof name === "string" ? name : "Người dùng";
@@ -36,11 +40,14 @@ export default function ChatScreen() {
     const [loaded, setLoaded] = useState(false);
     const flatListRef = useRef<FlatList>(null);
     const [showGroupInfo, setShowGroupInfo] = useState(false);
+    const [showChatOptions, setShowChatOptions] = useState(false);
     const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+    const slideOptionsAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
 
     const [selectedMessage, setSelectedMessage] = useState<MessageDynamo | null>(null);
     const [showActionSheet, setShowActionSheet] = useState(false);
     const [showPinnedList, setShowPinnedList] = useState(false);
+    const [reactionListMessage, setReactionListMessage] = useState<MessageDynamo | null>(null);
     const [replyTo, setReplyTo] = useState<{
         messageId: string;
         senderName?: string;
@@ -64,6 +71,23 @@ export default function ChatScreen() {
         }).start(() => setShowGroupInfo(false));
     };
 
+    const openChatOptions = () => {
+        setShowChatOptions(true);
+        Animated.spring(slideOptionsAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 0,
+        }).start();
+    };
+
+    const closeChatOptions = () => {
+        Animated.timing(slideOptionsAnim, {
+            toValue: SCREEN_WIDTH,
+            duration: 250,
+            useNativeDriver: true,
+        }).start(() => setShowChatOptions(false));
+    };
+
     const currentUserId = useUserStore((s) => s.profile?.id);
 
     // ─── Load chat history ───
@@ -80,6 +104,16 @@ export default function ChatScreen() {
         } finally {
             setLoaded(true);
         }
+    }, [roomId]);
+
+    // ─── Reset Unread Count via Store ───
+    useEffect(() => {
+        if (roomId) {
+            useChatStore.getState().setCurrentRoom(roomId as string);
+        }
+        return () => {
+            useChatStore.getState().setCurrentRoom(null);
+        };
     }, [roomId]);
 
     // ─── WebSocket: subscribe to room for realtime ───
@@ -152,20 +186,31 @@ export default function ChatScreen() {
                     messageId?: string;
                     userId?: string;
                     emoji?: string | null;
+                    action?: "add" | "remove" | "removeAll";
                 };
                 if (!payload?.messageId || !payload.userId) return;
+                const action = payload.action ?? (payload.emoji ? "add" : "removeAll");
                 setMessages((prev) =>
                     prev.map((m) => {
                         if (m.messageId !== payload.messageId) return m;
                         const reactions = Array.isArray(m.reactions) ? [...m.reactions] : [];
-                        const filtered = reactions.filter((r) => r.userId !== payload.userId);
-                        if (payload.emoji) {
-                            filtered.push({
-                                userId: payload.userId,
-                                emoji: payload.emoji,
-                            } as MessageReaction);
+                        if (action === "removeAll") {
+                            const next = reactions.filter((r) => r.userId !== payload.userId);
+                            return { ...m, reactions: next };
                         }
-                        return { ...m, reactions: filtered };
+                        if (action === "remove" && payload.emoji) {
+                            const next = reactions.filter(
+                                (r) => !(r.userId === payload.userId && r.emoji === payload.emoji)
+                            );
+                            return { ...m, reactions: next };
+                        }
+                        if (action === "add" && payload.emoji) {
+                            return {
+                                ...m,
+                                reactions: [...reactions, { userId: payload.userId!, emoji: payload.emoji } as MessageReaction],
+                            };
+                        }
+                        return m;
                     })
                 );
             } catch (err) {
@@ -340,6 +385,16 @@ export default function ChatScreen() {
         closeActionSheet();
     };
 
+    // Map userId -> tên hiển thị (từ tin nhắn trong phòng hoặc "Tôi")
+    const reactionUserNameMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        if (currentUserId) map[currentUserId] = "Tôi";
+        messages.forEach((m) => {
+            if (m.senderId && m.senderName) map[m.senderId] = m.senderName;
+        });
+        return map;
+    }, [messages, currentUserId]);
+
     // ─── Render ───
     const renderMessage = ({ item }: { item: MessageDynamo }) => {
         const isMe = item.senderId === currentUserId;
@@ -358,6 +413,7 @@ export default function ChatScreen() {
                 showSenderName={roomType === "GROUP"}
                 onPress={handleMessagePress}
                 onLongPress={handleMessageLongPress}
+                onPressReactions={(msg) => setReactionListMessage(msg)}
                 replyPreview={
                     replySource
                         ? {
@@ -378,6 +434,8 @@ export default function ChatScreen() {
                 onMenuPress={() => {
                     if (roomType === "GROUP") {
                         openGroupInfo();
+                    } else {
+                        openChatOptions();
                     }
                 }}
             />
@@ -398,6 +456,28 @@ export default function ChatScreen() {
                     <GroupInfoScreen
                         roomId={roomId}
                         onClose={closeGroupInfo}
+                    />
+                </Animated.View>
+            )}
+
+            {/* Chat Options (Personal) - Slide from right */}
+            {showChatOptions && (
+                <Animated.View
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 100,
+                        transform: [{ translateX: slideOptionsAnim }],
+                    }}
+                >
+                    <ChatOptionsScreen
+                        roomId={roomId}
+                        name={displayName}
+                        avatarUrl={useChatStore.getState().rooms.find(r => r.id === roomId)?.avatarUrl || undefined}
+                        onClose={closeChatOptions}
                     />
                 </Animated.View>
             )}
@@ -563,21 +643,11 @@ export default function ChatScreen() {
                                         onPress={async () => {
                                             if (!selectedMessage || !roomId || !currentUserId) return;
                                             try {
-                                                const currentReaction = (selectedMessage.reactions || []).find(
-                                                    (r) => r.userId === currentUserId
+                                                await MessageService.setReaction(
+                                                    roomId,
+                                                    selectedMessage.messageId,
+                                                    emoji
                                                 );
-                                                if (currentReaction && currentReaction.emoji === emoji) {
-                                                    await MessageService.removeReaction(
-                                                        roomId,
-                                                        selectedMessage.messageId
-                                                    );
-                                                } else {
-                                                    await MessageService.setReaction(
-                                                        roomId,
-                                                        selectedMessage.messageId,
-                                                        emoji
-                                                    );
-                                                }
                                             } catch (err) {
                                                 console.log("Error sending reaction:", err);
                                             } finally {
@@ -711,50 +781,204 @@ export default function ChatScreen() {
                                 messages
                                     .filter((m) => m.pinned)
                                     .map((m) => (
-                                        <TouchableOpacity
+                                        <View
                                             key={m.messageId}
-                                            onPress={() => {
-                                                const index = messages.findIndex(
-                                                    (x) => x.messageId === m.messageId
-                                                );
-                                                if (index >= 0) {
-                                                    flatListRef.current?.scrollToIndex({
-                                                        index,
-                                                        animated: true,
-                                                    });
-                                                }
-                                                setShowPinnedList(false);
-                                            }}
                                             style={{
-                                                paddingHorizontal: 16,
+                                                flexDirection: "row",
+                                                alignItems: "center",
                                                 paddingVertical: 10,
+                                                paddingHorizontal: 16,
                                                 borderBottomWidth: 0.5,
                                                 borderBottomColor: "#374151",
                                             }}
                                         >
-                                            <Text
-                                                style={{
-                                                    color: "#e5e7eb",
-                                                    fontSize: 14,
-                                                    marginBottom: 4,
+                                            <TouchableOpacity
+                                                style={{ flex: 1 }}
+                                                onPress={() => {
+                                                    const index = messages.findIndex(
+                                                        (x) => x.messageId === m.messageId
+                                                    );
+                                                    if (index >= 0) {
+                                                        flatListRef.current?.scrollToIndex({
+                                                            index,
+                                                            animated: true,
+                                                        });
+                                                    }
+                                                    setShowPinnedList(false);
                                                 }}
-                                                numberOfLines={2}
                                             >
-                                                {m.content || "[Tin nhắn]"}
-                                            </Text>
-                                            <Text
+                                                <Text
+                                                    style={{
+                                                        color: "#e5e7eb",
+                                                        fontSize: 14,
+                                                        marginBottom: 4,
+                                                    }}
+                                                    numberOfLines={2}
+                                                >
+                                                    {m.content || "[Tin nhắn]"}
+                                                </Text>
+                                                <Text
+                                                    style={{
+                                                        color: "#9ca3af",
+                                                        fontSize: 12,
+                                                    }}
+                                                >
+                                                    {formatTime(m.createdAt)}
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                onPress={(e) => {
+                                                    e?.stopPropagation?.();
+                                                    if (!roomId) return;
+                                                    webSocketService.sendPin({
+                                                        roomId,
+                                                        messageId: m.messageId,
+                                                        pin: false,
+                                                    });
+                                                }}
+                                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                                                 style={{
-                                                    color: "#9ca3af",
-                                                    fontSize: 12,
+                                                    padding: 8,
+                                                    marginLeft: 8,
                                                 }}
                                             >
-                                                {formatTime(m.createdAt)}
-                                            </Text>
-                                        </TouchableOpacity>
+                                                <Text style={{ color: "#9ca3af", fontSize: 18 }}>×</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     ))
                             )}
                         </View>
                     </View>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Danh sách reaction – bấm vào dải reaction dưới tin nhắn */}
+            <Modal
+                transparent
+                animationType="slide"
+                visible={!!reactionListMessage}
+                onRequestClose={() => setReactionListMessage(null)}
+            >
+                <TouchableOpacity
+                    activeOpacity={1}
+                    style={{
+                        flex: 1,
+                        backgroundColor: "rgba(0,0,0,0.4)",
+                        justifyContent: "flex-end",
+                    }}
+                    onPress={() => setReactionListMessage(null)}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => {}}
+                        style={{
+                            backgroundColor: "#111827",
+                            paddingTop: 12,
+                            paddingBottom: 24,
+                            borderTopLeftRadius: 16,
+                            borderTopRightRadius: 16,
+                            maxHeight: "60%",
+                        }}
+                    >
+                        {reactionListMessage && (() => {
+                            const raw = reactionListMessage.reactions;
+                            const reactions = Array.isArray(raw) ? raw : [];
+                            const total = reactions.length;
+                            const byEmoji = reactions.reduce<Record<string, number>>((acc, r) => {
+                                if (!r?.emoji) return acc;
+                                acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                return acc;
+                            }, {});
+                            const byUser = reactions.reduce<Record<string, string[]>>((acc, r) => {
+                                if (!r?.userId || !r?.emoji) return acc;
+                                if (!Array.isArray(acc[r.userId])) acc[r.userId] = [];
+                                if (!acc[r.userId].includes(r.emoji)) acc[r.userId].push(r.emoji);
+                                return acc;
+                            }, {});
+                            const userIds = Object.keys(byUser);
+                            return (
+                                <>
+                                    <View
+                                        style={{
+                                            flexDirection: "row",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            paddingHorizontal: 16,
+                                            marginBottom: 12,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color: "#e5e7eb",
+                                                fontSize: 16,
+                                                fontWeight: "600",
+                                            }}
+                                        >
+                                            Tất cả {total}
+                                        </Text>
+                                        <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                                            {Object.entries(byEmoji).map(([emoji, count]) => (
+                                                <Text
+                                                    key={emoji}
+                                                    style={{ color: "#e5e7eb", fontSize: 14, marginLeft: 12 }}
+                                                >
+                                                    {emoji} {count}
+                                                </Text>
+                                            ))}
+                                        </View>
+                                    </View>
+                                    <View style={{ maxHeight: "100%" }}>
+                                        {userIds.map((uid) => (
+                                            <View
+                                                key={uid}
+                                                style={{
+                                                    flexDirection: "row",
+                                                    alignItems: "center",
+                                                    paddingHorizontal: 16,
+                                                    paddingVertical: 10,
+                                                    borderBottomWidth: 0.5,
+                                                    borderBottomColor: "#374151",
+                                                }}
+                                            >
+                                                <View
+                                                    style={{
+                                                        width: 36,
+                                                        height: 36,
+                                                        borderRadius: 18,
+                                                        backgroundColor: "#374151",
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                        marginRight: 10,
+                                                    }}
+                                                >
+                                                    <Text style={{ color: "#e5e7eb", fontSize: 14 }}>
+                                                        {(reactionUserNameMap[uid] || uid).charAt(0)}
+                                                    </Text>
+                                                </View>
+                                                <Text
+                                                    style={{
+                                                        flex: 1,
+                                                        color: "#e5e7eb",
+                                                        fontSize: 14,
+                                                    }}
+                                                    numberOfLines={1}
+                                                >
+                                                    {reactionUserNameMap[uid] || "Người dùng"}
+                                                </Text>
+                                                <View style={{ flexDirection: "row" }}>
+                                                    {(Array.isArray(byUser[uid]) ? byUser[uid] : []).map((emoji) => (
+                                                        <Text key={emoji} style={{ fontSize: 16, marginLeft: 4 }}>
+                                                            {emoji}
+                                                        </Text>
+                                                    ))}
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </>
+                            );
+                        })()}
+                    </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
         </View>

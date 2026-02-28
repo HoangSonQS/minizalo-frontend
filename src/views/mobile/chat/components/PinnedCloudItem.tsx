@@ -9,11 +9,11 @@ export const PinnedCloudItem = () => {
             style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: '#0c0c15',
+                backgroundColor: '#0d0d0d',
                 paddingHorizontal: 16,
                 paddingVertical: 10,
                 borderBottomWidth: 0.5,
-                borderBottomColor: '#2d2d44',
+                borderBottomColor: '#27272a',
             }}
         >
             <View style={{ position: 'relative', marginRight: 12 }}>

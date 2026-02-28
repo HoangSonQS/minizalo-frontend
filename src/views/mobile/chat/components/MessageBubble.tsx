@@ -14,6 +14,7 @@ interface MessageBubbleProps {
     showSenderName?: boolean; // for group chats
     onLongPress?: (message: MessageDynamo) => void;
     onPress?: (message: MessageDynamo) => void;
+    onPressReactions?: (message: MessageDynamo) => void;
     replyPreview?: ReplyPreview | null;
 }
 
@@ -42,6 +43,7 @@ export default function MessageBubble({
     showSenderName,
     onLongPress,
     onPress,
+    onPressReactions,
     replyPreview,
 }: MessageBubbleProps) {
     const senderName = message.senderName;
@@ -169,9 +171,11 @@ export default function MessageBubble({
                     ) : null}
                 </View>
 
-                {/* Reactions – hiển thị nhỏ phía dưới bong bóng */}
+                {/* Reactions – hiển thị nhỏ phía dưới bong bóng, bấm vào mở danh sách */}
                 {Array.isArray(message.reactions) && message.reactions.length > 0 && (
-                    <View
+                    <TouchableOpacity
+                        onPress={() => onPressReactions?.(message)}
+                        activeOpacity={0.8}
                         style={{
                             flexDirection: "row",
                             alignSelf: isMe ? "flex-end" : "flex-start",
@@ -211,7 +215,7 @@ export default function MessageBubble({
                                 </Text>
                             </View>
                         ))}
-                    </View>
+                    </TouchableOpacity>
                 )}
             </TouchableOpacity>
         </View>

@@ -13,6 +13,7 @@ interface ChatItemProps {
 }
 
 export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified, onPress }: ChatItemProps) => {
+    const hasUnread = !!(unreadCount && unreadCount > 0);
     return (
         <TouchableOpacity
             onPress={onPress}
@@ -20,7 +21,7 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
             style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: '#0c0c15',
+                backgroundColor: '#0d0d0d',
                 paddingHorizontal: 16,
                 paddingVertical: 10,
             }}
@@ -42,14 +43,14 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
                         position: 'absolute',
                         bottom: 0,
                         right: 0,
-                        backgroundColor: '#0c0c15',
+                        backgroundColor: '#0d0d0d',
                         borderRadius: 999,
                         padding: 1.5,
                     }}>
                         <View style={{
                             width: 12,
                             height: 12,
-                            backgroundColor: '#0c0c15',
+                            backgroundColor: '#0d0d0d',
                             borderRadius: 999,
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -66,7 +67,7 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
             <View style={{
                 flex: 1,
                 borderBottomWidth: 0.5,
-                borderBottomColor: '#2d2d44',
+                borderBottomColor: '#27272a',
                 paddingBottom: 10,
                 justifyContent: 'center',
                 height: 60,
@@ -74,7 +75,7 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
                 {/* Top Row: Name + Time */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
-                        <Text style={{ fontSize: 16, color: '#e4e6eb', fontWeight: '400' }} numberOfLines={1}>{name}</Text>
+                        <Text style={{ fontSize: 16, color: '#e4e6eb', fontWeight: hasUnread ? '600' : '400' }} numberOfLines={1}>{name}</Text>
                         {isVerified && (
                             <View style={{
                                 marginLeft: 4,
@@ -89,7 +90,7 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
                             </View>
                         )}
                     </View>
-                    <Text style={{ fontSize: 12, color: '#7f8c8d' }}>{time}</Text>
+                    <Text style={{ fontSize: 12, color: hasUnread ? '#3b82f6' : '#7f8c8d', fontWeight: hasUnread ? '600' : '400' }}>{time}</Text>
                 </View>
 
                 {/* Bottom Row: Message + Badge */}
@@ -99,8 +100,8 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
                             fontSize: 14,
                             flex: 1,
                             marginRight: 16,
-                            color: unreadCount && unreadCount > 0 ? '#c8c9cc' : '#7f8c8d',
-                            fontWeight: unreadCount && unreadCount > 0 ? 'bold' : 'normal',
+                            color: hasUnread ? '#e4e6eb' : '#7f8c8d',
+                            fontWeight: hasUnread ? '600' : 'normal',
                         }}
                         numberOfLines={1}
                         ellipsizeMode="tail"
@@ -119,7 +120,7 @@ export const ChatItem = ({ avatar, name, message, time, unreadCount, isVerified,
                             paddingHorizontal: 4,
                         }}>
                             <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
-                                {unreadCount > 5 ? '5+' : unreadCount}
+                                {unreadCount! > 99 ? '99+' : unreadCount}
                             </Text>
                         </View>
                     ) : null}
