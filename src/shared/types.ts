@@ -37,6 +37,15 @@ export interface PinMessageRequest {
     pin: boolean;
 }
 
+export interface Attachment {
+    url: string;
+    type: string; // "IMAGE", "VIDEO", "DOCUMENT"
+    name: string;
+    filename?: string;
+    size: number;
+    thumbnailUrl?: string;
+}
+
 // Backend 'MessageDynamo' model equivalent
 export interface Message {
     id: string;
@@ -44,18 +53,20 @@ export interface Message {
     senderName?: string;
     roomId: string;
     content: string;
-    type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'STICKER' | 'REPLY' | 'FORWARD';
+    type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'DOCUMENT' | 'STICKER' | 'REPLY' | 'FORWARD' | 'SYSTEM';
     createdAt: string; // ISO string
     updatedAt?: string;
     isDeleted?: boolean;
     isRecall?: boolean;
-    reactions?: Record<string, string>; // userId -> emoji
+    pinned?: boolean;
+    reactions?: { userId: string; emoji: string }[];
     readBy?: string[]; // userIds
     replyToId?: string;
     replyMessage?: Message; // recursive optional
     fileUrl?: string;
     fileName?: string;
     fileSize?: number;
+    attachments?: Attachment[];
     forwardedFromId?: string; // original sender id if forwarded
     receiverId?: string; // Optional: ID of the receiver for private messages
 }

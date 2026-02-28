@@ -6,9 +6,15 @@ interface MessageListProps {
     messages: Message[];
     currentUserId: string;
     participants?: User[];
+    onRecall?: (messageId: string) => void;
+    onReact?: (messageId: string, emoji: string) => void;
+    onReply?: (message: Message) => void;
+    onTogglePin?: (messageId: string, currentPinStatus: boolean) => void;
+    onRemoveAllReactions?: (messageId: string) => void;
+    onDeleteForMe?: (messageId: string) => void;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ messages, currentUserId, participants = [] }) => {
+const MessageList: React.FC<MessageListProps> = ({ messages, currentUserId, participants = [], onRecall, onReact, onReply, onTogglePin, onRemoveAllReactions, onDeleteForMe }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const isNearBottom = useRef(true);
     const prevMessageCount = useRef(0);
@@ -84,21 +90,41 @@ const MessageList: React.FC<MessageListProps> = ({ messages, currentUserId, part
                             : undefined;
                         const senderAvatar = sender?.avatarUrl || undefined;
 
-                        // Khoảng cách: gần hơn khi cùng nhóm, xa hơn khi đổi người gửi
                         const marginBottom = isLastInGroup ? 'mb-3' : 'mb-0.5';
 
+                        const repliedMessage = msg.replyToId ? messages.find(m => m.id === msg.replyToId) : undefined;
+                        const isLatestMessage = index === messages.length - 1;
+
                         return (
-                            <MessageBubble
-                                key={msg.id || `msg-${index}`}
-                                message={msg}
-                                isMine={isMine}
-                                showAvatar={showAvatar}
-                                isFirstInGroup={isFirstInGroup}
-                                isLastInGroup={isLastInGroup}
-                                senderName={senderName}
-                                senderAvatar={senderAvatar}
-                                marginBottom={marginBottom}
-                            />
+                            <div key={msg.id || `msg-${index}`} id={`msg-${msg.id}`}>
+                                <MessageBubble
+                                    message={msg}
+                                    isMine={isMine}
+                                    showAvatar={showAvatar}
+                                    isFirstInGroup={isFirstInGroup}
+                                    isLastInGroup={isLastInGroup}
+                                    senderName={senderName}
+                                    senderAvatar={senderAvatar}
+                                    marginBottom={marginBottom}
+                                    onRecall={onRecall}
+                                    onReact={onReact}
+                                    onReply={onReply}
+                                    onTogglePin={onTogglePin}
+                                    onRemoveAllReactions={onRemoveAllReactions}
+                                    onDeleteForMe={onDeleteForMe}
+                                    participants={participants}
+                                    repliedMessage={repliedMessage}
+                                    isLatestMessage={isLatestMessage}
+                                    onScrollToMessage={(messageId) => {
+                                        const el = document.getElementById(`msg-${messageId}`);
+                                        if (el) {
+                                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                            el.classList.add('bg-yellow-100');
+                                            setTimeout(() => el.classList.remove('bg-yellow-100'), 1500);
+                                        }
+                                    }}
+                                />
+                            </div>
                         );
                     })
                 )}
