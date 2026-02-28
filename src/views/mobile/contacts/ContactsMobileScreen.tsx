@@ -11,7 +11,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import FriendsListMobile from "./FriendsListMobile";
-import { PROFILE_COLORS } from "../profile/styles";
+import { PROFILE_COLORS, profileStyles } from "../profile/styles";
 import { useRouter } from "expo-router";
 import { useFriendStore } from "@/shared/store/friendStore";
 import { useUserStore } from "@/shared/store/userStore";
@@ -247,6 +247,51 @@ export default function ContactsMobileScreen() {
             )}
 
             {/* Header: ô tìm kiếm + icon thêm bạn */}
+            <View style={profileStyles.searchRow}>
+                <View style={profileStyles.searchBox}>
+                    <Ionicons
+                        name="search"
+                        size={20}
+                        color={PROFILE_COLORS.textSecondary}
+                    />
+                    <TextInput
+                        style={profileStyles.searchInput}
+                        value={searchText}
+                        onChangeText={setSearchText}
+                        placeholder="Tìm kiếm"
+                        placeholderTextColor={PROFILE_COLORS.textSecondary}
+                        showSoftInputOnFocus={false}
+                        onFocus={() => {
+                            router.push("/(tabs)/contacts-search");
+                            setSearchText("");
+                        }}
+                    />
+                    {searchText ? (
+                        <TouchableOpacity
+                            onPress={() => setSearchText("")}
+                            style={{ paddingLeft: 4 }}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name="close-circle"
+                                size={18}
+                                color={PROFILE_COLORS.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
+                <TouchableOpacity
+                    style={profileStyles.settingsButton}
+                    activeOpacity={0.8}
+                    onPress={() => router.push("/(tabs)/contacts-add")}
+                >
+                    <Ionicons
+                        name="person-add-outline"
+                        size={24}
+                        color={PROFILE_COLORS.text}
+                    />
+                </TouchableOpacity>
+            </View>
             <View
                 style={{
                     paddingTop: Platform.OS === "android" ? 8 : 16,
@@ -327,12 +372,20 @@ export default function ContactsMobileScreen() {
                         />
                     </TouchableOpacity>
                 </View>
+            </View>
 
-                {/* Tabs nhỏ dưới header */}
+            {/* Tabs nhỏ (tách khỏi thanh tìm kiếm) */}
+            <View
+                style={{
+                    paddingHorizontal: 16,
+                    paddingTop: 12,
+                    paddingBottom: 4,
+                    backgroundColor: PROFILE_COLORS.background,
+                }}
+            >
                 <View
                     style={{
                         flexDirection: "row",
-                        marginTop: 12,
                         borderRadius: 999,
                         backgroundColor: "#1f1f21",
                         padding: 2,
