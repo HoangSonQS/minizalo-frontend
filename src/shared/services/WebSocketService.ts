@@ -126,19 +126,23 @@ class WebSocketService {
         receiverId: string,
         content: string,
         type: string = "TEXT",
-        replyToMessageId?: string
+        replyToMessageId?: string,
+        attachments?: { url: string; type: string; filename: string; size: number }[]
     ): boolean {
         if (!this.client.connected) {
             console.error("Cannot send message: STOMP not connected");
             return false;
         }
-        const body: ChatMessageRequest = {
+        const body: any = {
             receiverId,
             content,
-            type: type as any,
+            type,
         };
         if (replyToMessageId) {
             body.replyToMessageId = replyToMessageId;
+        }
+        if (attachments && attachments.length > 0) {
+            body.attachments = attachments;
         }
         this.client.publish({
             destination: "/app/chat.send",
