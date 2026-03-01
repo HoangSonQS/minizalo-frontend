@@ -262,8 +262,11 @@ export default function ContactsMobileScreen() {
                         placeholderTextColor={PROFILE_COLORS.textSecondary}
                         showSoftInputOnFocus={false}
                         onFocus={() => {
-                            router.push("/(tabs)/contacts-search");
                             setSearchText("");
+                            router.push({
+                                pathname: "/(tabs)/contacts-search",
+                                params: { from: "contacts", t: Date.now() },
+                            });
                         }}
                     />
                     {searchText ? (
@@ -292,89 +295,8 @@ export default function ContactsMobileScreen() {
                     />
                 </TouchableOpacity>
             </View>
-            <View
-                style={{
-                    paddingTop: Platform.OS === "android" ? 8 : 16,
-                    paddingBottom: 8,
-                    paddingHorizontal: 16,
-                    backgroundColor: PROFILE_COLORS.background,
-                }}
-            >
-                <View
-                    style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 12,
-                    }}
-                >
-                    <View
-                        style={{
-                            flex: 1,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            borderRadius: 10,
-                            backgroundColor: "#2c2c2e",
-                            paddingHorizontal: 10,
-                            paddingVertical: 8,
-                        }}
-                    >
-                        <Ionicons
-                            name="search"
-                            size={18}
-                            color={PROFILE_COLORS.textSecondary}
-                            style={{ marginRight: 6 }}
-                        />
-                        <TextInput
-                            value={searchText}
-                            onChangeText={setSearchText}
-                            placeholder="Tìm kiếm"
-                            placeholderTextColor={PROFILE_COLORS.textSecondary}
-                            style={{
-                                flex: 1,
-                                color: PROFILE_COLORS.text,
-                                fontSize: 14,
-                                paddingVertical: 0,
-                            }}
-                            showSoftInputOnFocus={false}
-                            onFocus={(e) => {
-                                e.target.blur();
-                                // Mở màn tìm kiếm chung và focus input bên đó
-                                router.push("/(tabs)/contacts-search");
-                                // Xóa text cũ để lần sau vào lại luôn sạch
-                                setSearchText("");
-                            }}
-                        />
-                        {searchText ? (
-                            <TouchableOpacity
-                                onPress={() => setSearchText("")}
-                                style={{ paddingLeft: 6 }}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons
-                                    name="close-circle"
-                                    size={18}
-                                    color={PROFILE_COLORS.textSecondary}
-                                />
-                            </TouchableOpacity>
-                        ) : null}
-                    </View>
-                    <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => router.push("/(tabs)/contacts-add")}
-                        style={{
-                            padding: 6,
-                        }}
-                    >
-                        <Ionicons
-                            name="person-add-outline"
-                            size={22}
-                            color={PROFILE_COLORS.text}
-                        />
-                    </TouchableOpacity>
-                </View>
-            </View>
 
-            {/* Tabs nhỏ (tách khỏi thanh tìm kiếm) */}
+            {/* Tabs: Bạn bè / Nhóm */}
             <View
                 style={{
                     paddingHorizontal: 16,

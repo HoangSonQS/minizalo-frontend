@@ -96,12 +96,12 @@ export const ChatListHeader = () => {
                             }}
                             showSoftInputOnFocus={false}
                             onFocus={(e) => {
-                                // Bỏ focus ngay lập tức để khi back lại không bị dính focus
                                 e.target.blur();
-                                // Mở màn tìm kiếm chung và focus input bên đó
-                                router.push("/(tabs)/contacts-search");
-                                // Xóa text cũ để lần sau vào lại luôn sạch
                                 setSearchText("");
+                                router.push({
+                                    pathname: "/(tabs)/contacts-search",
+                                    params: { from: "chat", t: Date.now() },
+                                });
                             }}
                         />
                         {searchText ? (

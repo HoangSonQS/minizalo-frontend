@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -9,10 +9,16 @@ import {
     Modal,
     TextInput,
     ScrollView,
+    Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { GestureHandlerRootView, Swipeable } from "react-native-gesture-handler";
+import { useRouter } from "expo-router";
 import { useFriendStore } from "@/shared/store/friendStore";
+import { useChatStore } from "@/shared/store/useChatStore";
+import { useUserStore } from "@/shared/store/userStore";
 import type { FriendResponseDto } from "@/shared/services/types";
+import type { UserProfile } from "@/shared/services/types";
 import { PROFILE_COLORS } from "../profile/styles";
 import friendCategoryService, {
     type FriendCategory,
@@ -25,31 +31,43 @@ type FriendsListMobileProps = {
 };
 
 function getFriendUser(item: FriendResponseDto, currentUserId?: string | null) {
-    // Hiện tại chưa cần currentUserId cho mobile: chỉ cần trả friend là user còn lại
     if (!currentUserId) return item.friend;
     return item.user.id === currentUserId ? item.friend : item.user;
 }
 
+const CLOSE_FRIEND_CATEGORY_NAME = "Bạn thân";
+
 export default function FriendsListMobile({ searchText = "" }: FriendsListMobileProps) {
+    const router = useRouter();
     const { friends, loading, error, fetchFriends, removeFriend, clearError } =
         useFriendStore();
+    const { rooms } = useChatStore();
+    const currentUser = useUserStore((s) => s.profile);
 
     const [categories, setCategories] = useState<FriendCategory[]>([]);
     const [friendCategoryMap, setFriendCategoryMap] = useState<
         Record<string, string | undefined>
     >({});
-    const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+    const [closeFriendCategoryId, setCloseFriendCategoryId] = useState<string | null>(null);
     const [manageCategoriesVisible, setManageCategoriesVisible] =
         useState(false);
+    const [actionSheetFriend, setActionSheetFriend] = useState<{
+        raw: FriendResponseDto;
+        user: UserProfile;
+        displayName: string;
+    } | null>(null);
+    const swipeableRefsMap = useRef<Record<string, Swipeable | null>>({});
+    const [blockSheetFriend, setBlockSheetFriend] = useState<{
+        userId: string;
+        displayName: string;
+    } | null>(null);
+    const [blockOptions, setBlockOptions] = useState({ blockMessages: false, blockCalls: false, blockTimeline: false });
+    const [addToCloseFriendsVisible, setAddToCloseFriendsVisible] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
         null
     );
     const [editingCategoryName, setEditingCategoryName] = useState("");
-    const [assignTarget, setAssignTarget] = useState<{
-        userId: string;
-        name: string;
-    } | null>(null);
 
     const randomColor = () => {
         const palette = [
@@ -86,6 +104,23 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                     }
                 });
                 setFriendCategoryMap(map);
+                let closeId = cats.find((c) => c.name === CLOSE_FRIEND_CATEGORY_NAME)?.id ?? null;
+                if (!closeId) {
+                    try {
+                        const created = await friendCategoryService.createCategory({
+                            name: CLOSE_FRIEND_CATEGORY_NAME,
+                            color: "#eab308",
+                        });
+                        if (!cancelled) {
+                            setCategories((prev) => [...prev, created]);
+                            setCloseFriendCategoryId(created.id);
+                        }
+                    } catch {
+                        // ignore: có thể đã có từ trước
+                    }
+                } else {
+                    setCloseFriendCategoryId(closeId);
+                }
             } catch {
                 // ignore lỗi mạng: vẫn cho phép xem danh sách bạn
             }
@@ -99,26 +134,29 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
         const normalizedSearch = searchText.trim().toLowerCase();
         const items = friends
             .map((item) => {
-                const u = getFriendUser(item);
+                const u = getFriendUser(item, currentUser?.id);
                 const name = (u.displayName || u.username || "").trim();
                 return { raw: item, user: u, name };
             })
             .filter(({ name }) =>
                 normalizedSearch ? name.toLowerCase().includes(normalizedSearch) : true
             )
-            .filter(({ user }) => {
-                if (selectedCategoryId === "all") return true;
-                const catId = friendCategoryMap[user.id];
-                return catId === selectedCategoryId;
-            })
             .sort((a, b) =>
                 a.name.localeCompare(b.name, "vi", { sensitivity: "base" })
             );
 
-        const groups: { key: string; data: typeof items }[] = [];
-        const map: Record<string, typeof items> = {};
+        const closeFriends = closeFriendCategoryId
+            ? items.filter(({ user }) => friendCategoryMap[user.id] === closeFriendCategoryId)
+            : [];
+        // Danh sách chính theo chữ cái: gồm TẤT CẢ bạn bè (kể cả bạn thân)
+        const rest = items;
 
-        for (const it of items) {
+        const groups: { key: string; data: typeof items }[] = [];
+        if (closeFriends.length > 0) {
+            groups.push({ key: "__closeFriends", data: closeFriends });
+        }
+        const map: Record<string, typeof items> = {};
+        for (const it of rest) {
             const letter = it.name.charAt(0).toUpperCase() || "#";
             const key = /[A-ZÁÀÂÃĂẠẢẤẦẨẪẬẮẰẲẴẶÉÈẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴ]/.test(
                 letter
@@ -128,15 +166,13 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
             if (!map[key]) map[key] = [];
             map[key].push(it);
         }
-
         Object.keys(map)
             .sort((a, b) => a.localeCompare(b))
             .forEach((k) => {
                 groups.push({ key: k, data: map[k] });
             });
-
         return groups;
-    }, [friends, searchText, selectedCategoryId, friendCategoryMap]);
+    }, [friends, searchText, friendCategoryMap, closeFriendCategoryId, currentUser?.id]);
 
     const handleAssignCategory = async (userId: string, categoryId: string) => {
         const current = friendCategoryMap[userId];
@@ -279,17 +315,54 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
         );
     };
 
+    const renderSwipeLeftActions = (
+        userId: string,
+        displayName: string,
+        raw: FriendResponseDto,
+        user: UserProfile,
+        onCloseSwipeable?: () => void
+    ) => (
+        <View style={{ flexDirection: "row", alignItems: "stretch" }}>
+            <TouchableOpacity
+                onPress={() => {
+                    onCloseSwipeable?.();
+                    setActionSheetFriend({ raw, user, displayName });
+                }}
+                style={{
+                    backgroundColor: "#374151",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingHorizontal: 20,
+                    minWidth: 72,
+                }}
+            >
+                <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+                <Text style={{ color: "#fff", fontSize: 11, marginTop: 2 }}>Thêm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+                onPress={() => handleRemoveFriend(userId, displayName)}
+                style={{
+                    backgroundColor: "#ef4444",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingHorizontal: 20,
+                    minWidth: 72,
+                }}
+            >
+                <Ionicons name="trash-outline" size={20} color="#fff" />
+                <Text style={{ color: "#fff", fontSize: 11, marginTop: 2 }}>Xóa</Text>
+            </TouchableOpacity>
+        </View>
+    );
+
     const renderFriendRow = (item: FriendResponseDto) => {
-        const u = getFriendUser(item);
+        const u = getFriendUser(item, currentUser?.id);
         const displayName = u.displayName || u.username || "Người dùng";
         const initial =
             (displayName.charAt(0).toUpperCase() || "?").toUpperCase();
-        const categoryId = friendCategoryMap[u.id];
-        const category = categories.find((c) => c.id === categoryId);
 
-        return (
+        const rowContent = (
             <TouchableOpacity
-                key={item.id}
                 activeOpacity={0.8}
                 style={{
                     flexDirection: "row",
@@ -299,7 +372,6 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                     backgroundColor: PROFILE_COLORS.background,
                 }}
             >
-                {/* Avatar tròn */}
                 <View
                     style={{
                         width: 40,
@@ -311,7 +383,6 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                         marginRight: 12,
                     }}
                 >
-                    {/* Sau có avatarUrl thì dùng Image */}
                     <Text
                         style={{
                             color: PROFILE_COLORS.text,
@@ -322,8 +393,6 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                         {initial}
                     </Text>
                 </View>
-
-                {/* Tên & status */}
                 <View style={{ flex: 1 }}>
                     <Text
                         numberOfLines={1}
@@ -335,33 +404,6 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                     >
                         {displayName}
                     </Text>
-                    {category ? (
-                        <View
-                            style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                marginTop: 2,
-                            }}
-                        >
-                            <View
-                                style={{
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: 5,
-                                    backgroundColor: category.color,
-                                    marginRight: 6,
-                                }}
-                            />
-                            <Text
-                                style={{
-                                    color: PROFILE_COLORS.textSecondary,
-                                    fontSize: 12,
-                                }}
-                            >
-                                {category.name}
-                            </Text>
-                        </View>
-                    ) : null}
                     {u.statusMessage ? (
                         <Text
                             numberOfLines={1}
@@ -375,248 +417,107 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                         </Text>
                     ) : null}
                 </View>
-
-                {/* Action nhanh: Thẻ, Chặn & Xóa */}
-                <TouchableOpacity
-                    onPress={() =>
-                        setAssignTarget({
-                            userId: u.id,
-                            name: displayName,
-                        })
-                    }
-                    style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 999,
-                        borderWidth: 1,
-                        borderColor: "#4b5563",
-                        marginLeft: 4,
-                    }}
-                >
-                    <Text
-                        style={{
-                            color: "#9ca3af",
-                            fontSize: 12,
-                            fontWeight: "500",
-                        }}
-                    >
-                        Thẻ
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={async () => {
-                        try {
-                            await friendService.blockUser(u.id);
-                            // Cập nhật local: xóa khỏi friends nhưng KHÔNG xóa entry BLOCKED trong backend
-                            useFriendStore.setState((prev) => ({
-                                friends: prev.friends.filter(
-                                    (f) =>
-                                        f.user.id !== u.id &&
-                                        f.friend.id !== u.id
-                                ),
-                            }));
-                            Alert.alert(
-                                "Đã chặn",
-                                "Người này đã bị chặn và ẩn khỏi danh sách bạn."
-                            );
-                        } catch {
-                            Alert.alert("Lỗi", "Không chặn được người này.");
-                        }
-                    }}
-                    style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 999,
-                        borderWidth: 1,
-                        borderColor: "#4b5563",
-                        marginLeft: 4,
-                    }}
-                >
-                    <Text
-                        style={{
-                            color: "#9ca3af",
-                            fontSize: 12,
-                            fontWeight: "500",
-                        }}
-                    >
-                        Chặn
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={() =>
-                        handleRemoveFriend(
-                            u.id,
-                            u.displayName || u.username || "người này"
-                        )
-                    }
-                    style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 999,
-                        borderWidth: 1,
-                        borderColor: "#ef4444",
-                        marginLeft: 4,
-                    }}
-                >
-                    <Text
-                        style={{
-                            color: "#f97373",
-                            fontSize: 12,
-                            fontWeight: "500",
-                        }}
-                    >
-                        Xóa
-                    </Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity style={{ padding: 6 }} onPress={() => {}}>
+                        <Ionicons name="call-outline" size={22} color={PROFILE_COLORS.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ padding: 6, marginLeft: 4 }} onPress={() => {}}>
+                        <Ionicons name="videocam-outline" size={22} color={PROFILE_COLORS.text} />
+                    </TouchableOpacity>
+                </View>
             </TouchableOpacity>
         );
+
+        return (
+            <Swipeable
+                key={item.id}
+                ref={(r) => {
+                    if (r) swipeableRefsMap.current[u.id] = r;
+                }}
+                renderRightActions={() =>
+                    renderSwipeLeftActions(u.id, displayName, item, u, () => swipeableRefsMap.current[u.id]?.close?.())
+                }
+                friction={2}
+            >
+                {rowContent}
+            </Swipeable>
+        );
     };
+
+    const closeFriendsCount = useMemo(() => {
+        if (!closeFriendCategoryId) return 0;
+        return friends.filter(
+            (f) => friendCategoryMap[getFriendUser(f, currentUser?.id).id] === closeFriendCategoryId
+        ).length;
+    }, [friends, friendCategoryMap, closeFriendCategoryId, currentUser?.id]);
 
     const renderSection = ({
         item,
     }: {
-        item: { key: string; data: { raw: FriendResponseDto }[] };
+        item: { key: string; data: { raw: FriendResponseDto; user: UserProfile; name: string }[] };
     }) => {
+        const isCloseFriendsSection = item.key === "__closeFriends";
         return (
             <View>
-                {/* Header chữ cái */}
-                <View
-                    style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 6,
-                        backgroundColor: "#111111",
-                    }}
-                >
-                    <Text
+                {!isCloseFriendsSection && (
+                    <View
                         style={{
-                            color: PROFILE_COLORS.textSecondary,
-                            fontSize: 12,
-                            fontWeight: "600",
+                            paddingHorizontal: 16,
+                            paddingVertical: 6,
+                            backgroundColor: "#111111",
                         }}
                     >
-                        {item.key}
-                    </Text>
-                </View>
+                        <Text
+                            style={{
+                                color: PROFILE_COLORS.textSecondary,
+                                fontSize: 12,
+                                fontWeight: "600",
+                            }}
+                        >
+                            {item.key}
+                        </Text>
+                    </View>
+                )}
                 {item.data.map(({ raw }) => renderFriendRow(raw))}
             </View>
         );
     };
 
-    const renderCategoryFilter = () => {
+    const renderCloseFriendsBar = () => {
+        if (closeFriendsCount === 0) return null;
         return (
             <View
                 style={{
                     flexDirection: "row",
                     alignItems: "center",
+                    justifyContent: "space-between",
                     paddingHorizontal: 16,
-                    paddingVertical: 8,
+                    paddingVertical: 10,
                     borderBottomWidth: 0.5,
                     borderBottomColor: "#262626",
                     backgroundColor: PROFILE_COLORS.background,
                 }}
             >
-                <View
-                    style={{
-                        flex: 1,
-                        flexDirection: "row",
-                        alignItems: "center",
-                    }}
-                >
-                    <TouchableOpacity
-                        onPress={() => setSelectedCategoryId("all")}
-                        style={{
-                            paddingHorizontal: 10,
-                            paddingVertical: 4,
-                            borderRadius: 999,
-                            borderWidth: 1,
-                            borderColor:
-                                selectedCategoryId === "all"
-                                    ? PROFILE_COLORS.primary
-                                    : "#4b5563",
-                            marginRight: 8,
-                        }}
-                    >
-                        <Text
-                            style={{
-                                color:
-                                    selectedCategoryId === "all"
-                                        ? PROFILE_COLORS.primary
-                                        : PROFILE_COLORS.textSecondary,
-                                fontSize: 12,
-                                fontWeight: "500",
-                            }}
-                        >
-                            Tất cả
-                        </Text>
-                    </TouchableOpacity>
-                    <FlatList
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        data={categories}
-                        keyExtractor={(c) => c.id}
-                        renderItem={({ item: c }) => {
-                            const active = selectedCategoryId === c.id;
-                            return (
-                                <TouchableOpacity
-                                    onPress={() =>
-                                        setSelectedCategoryId(
-                                            active ? "all" : c.id
-                                        )
-                                    }
-                                    style={{
-                                        flexDirection: "row",
-                                        alignItems: "center",
-                                        paddingHorizontal: 10,
-                                        paddingVertical: 4,
-                                        borderRadius: 999,
-                                        borderWidth: 1,
-                                        borderColor: active ? c.color : "#4b5563",
-                                        marginRight: 8,
-                                    }}
-                                >
-                                    <View
-                                        style={{
-                                            width: 10,
-                                            height: 10,
-                                            borderRadius: 5,
-                                            backgroundColor: c.color,
-                                            marginRight: 6,
-                                        }}
-                                    />
-                                    <Text
-                                        style={{
-                                            color: active
-                                                ? PROFILE_COLORS.text
-                                                : PROFILE_COLORS.textSecondary,
-                                            fontSize: 12,
-                                        }}
-                                    >
-                                        {c.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        }}
-                    />
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Ionicons name="star" size={18} color={"yellow"} style={{ marginRight: 6 }} />
+                    <Text style={{ color: PROFILE_COLORS.text, fontSize: 15, fontWeight: "600" }}>
+                        Bạn thân
+                    </Text>
                 </View>
                 <TouchableOpacity
-                    onPress={() => setManageCategoriesVisible(true)}
-                    style={{
-                        marginLeft: 8,
-                        padding: 6,
-                        borderRadius: 999,
-                    }}
+                    onPress={() => setAddToCloseFriendsVisible(true)}
+                    style={{ paddingVertical: 4, paddingHorizontal: 8 }}
                 >
-                    <Ionicons
-                        name="settings-outline"
-                        size={18}
-                        color={PROFILE_COLORS.textSecondary}
-                    />
+                    <Text style={{ color: PROFILE_COLORS.primary, fontSize: 14, fontWeight: "500" }}>
+                        + Thêm
+                    </Text>
                 </TouchableOpacity>
             </View>
         );
     };
 
     return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
         <View
             style={{
                 flex: 1,
@@ -643,7 +544,11 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                 </TouchableOpacity>
             ) : null}
 
-            {renderCategoryFilter()}
+            <View style={{ height: 6, backgroundColor: "#374151" }} />
+
+            {renderCloseFriendsBar()}
+
+            <View style={{ height: 1, backgroundColor: "#374151" }} />
 
             {loading && friends.length === 0 ? (
                 <View
@@ -708,164 +613,208 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                     contentContainerStyle={{ paddingBottom: 24 }}
                 />
             )}
-            {/* Modal gán thẻ phân loại */}
-            {assignTarget && (
+            {/* Modal Thêm (từ swipe): avatar, toggle Bạn thân, Xem trang cá nhân, Quản lý chặn, Xóa bạn, Nhắn tin */}
+            {actionSheetFriend && (
                 <Modal
                     transparent
                     visible
                     animationType="slide"
-                    onRequestClose={() => setAssignTarget(null)}
+                    onRequestClose={() => setActionSheetFriend(null)}
                 >
-                    <View
-                        style={{
-                            flex: 1,
-                            backgroundColor: "rgba(0,0,0,0.6)",
-                            justifyContent: "flex-end",
-                        }}
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}
+                        onPress={() => setActionSheetFriend(null)}
                     >
-                        <View
-                            style={{
-                                backgroundColor: "#18181b",
-                                borderTopLeftRadius: 16,
-                                borderTopRightRadius: 16,
-                                paddingHorizontal: 16,
-                                paddingTop: 12,
-                                paddingBottom: 24,
-                                maxHeight: "70%",
-                            }}
-                        >
-                            <View
-                                style={{
-                                    alignItems: "center",
-                                    marginBottom: 8,
-                                }}
-                            >
-                                <View
-                                    style={{
-                                        width: 40,
-                                        height: 4,
-                                        borderRadius: 999,
-                                        backgroundColor: "#3f3f46",
-                                    }}
-                                />
-                            </View>
-                            <Text
-                                style={{
-                                    color: PROFILE_COLORS.text,
-                                    fontSize: 16,
-                                    fontWeight: "600",
-                                    textAlign: "center",
-                                    marginBottom: 4,
-                                }}
-                            >
-                                Phân loại bạn bè
-                            </Text>
-                            <Text
-                                style={{
-                                    color: PROFILE_COLORS.textSecondary,
-                                    fontSize: 13,
-                                    textAlign: "center",
-                                    marginBottom: 12,
-                                }}
-                            >
-                                {assignTarget.name}
-                            </Text>
-                            <ScrollView
-                                style={{ maxHeight: "80%" }}
-                                contentContainerStyle={{ paddingBottom: 16 }}
-                            >
-                                {categories.map((c) => {
-                                    const isSelected =
-                                        friendCategoryMap[assignTarget.userId] ===
-                                        c.id;
-                                    return (
-                                        <TouchableOpacity
-                                            key={c.id}
-                                            onPress={async () => {
-                                                await handleAssignCategory(
-                                                    assignTarget.userId,
-                                                    c.id
-                                                );
-                                                setAssignTarget(null);
-                                            }}
-                                            style={{
-                                                flexDirection: "row",
-                                                alignItems: "center",
-                                                paddingVertical: 10,
-                                            }}
-                                        >
-                                            <View
-                                                style={{
-                                                    width: 18,
-                                                    height: 12,
-                                                    borderRadius: 999,
-                                                    backgroundColor: c.color,
-                                                    marginRight: 10,
-                                                }}
-                                            />
-                                            <Text
-                                                style={{
-                                                    flex: 1,
-                                                    color: PROFILE_COLORS.text,
-                                                    fontSize: 14,
-                                                }}
-                                            >
-                                                {c.name}
-                                            </Text>
-                                            {isSelected && (
-                                                <Ionicons
-                                                    name="checkmark"
-                                                    size={18}
-                                                    color={PROFILE_COLORS.primary}
-                                                />
-                                            )}
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                                {friendCategoryMap[assignTarget.userId] ? (
-                                    <TouchableOpacity
-                                        onPress={async () => {
-                                            await handleClearCategory(
-                                                assignTarget.userId
-                                            );
-                                            setAssignTarget(null);
-                                        }}
-                                        style={{
-                                            marginTop: 8,
-                                            paddingVertical: 10,
-                                        }}
-                                    >
-                                        <Text
-                                            style={{
-                                                color: "#f97373",
-                                                fontSize: 14,
-                                                textAlign: "center",
-                                            }}
-                                        >
-                                            Bỏ phân loại
-                                        </Text>
-                                    </TouchableOpacity>
-                                ) : null}
-                            </ScrollView>
-                            <TouchableOpacity
-                                onPress={() => setAssignTarget(null)}
-                                style={{
-                                    marginTop: 8,
-                                    paddingVertical: 10,
-                                }}
-                            >
-                                <Text
-                                    style={{
-                                        color: PROFILE_COLORS.textSecondary,
-                                        fontSize: 14,
-                                        textAlign: "center",
-                                    }}
-                                >
-                                    Đóng
+                        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ backgroundColor: "#18181b", borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}>
+                            <View style={{ alignItems: "center", marginBottom: 12 }}>
+                                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#2f3134", alignItems: "center", justifyContent: "center" }}>
+                                    <Text style={{ color: PROFILE_COLORS.text, fontSize: 24, fontWeight: "600" }}>
+                                        {(actionSheetFriend.displayName.charAt(0).toUpperCase() || "?").toUpperCase()}
+                                    </Text>
+                                </View>
+                                <Text style={{ color: PROFILE_COLORS.text, fontSize: 17, fontWeight: "600", marginTop: 8 }}>
+                                    {actionSheetFriend.displayName}
                                 </Text>
+                            </View>
+                            <View style={{ flexDirection: "row", marginBottom: 12 }}>
+                                <TouchableOpacity
+                                    onPress={() => { setActionSheetFriend(null); router.push({ pathname: "/(tabs)/account", params: { userId: actionSheetFriend.user.id } } as any); }}
+                                    style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#27272a", paddingVertical: 12, marginRight: 6, borderRadius: 10 }}
+                                >
+                                    <Ionicons name="person-outline" size={18} color={PROFILE_COLORS.text} style={{ marginRight: 6 }} />
+                                    <Text style={{ color: PROFILE_COLORS.text, fontSize: 14 }}>Xem trang cá nhân</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setBlockOptions({ blockMessages: false, blockCalls: false, blockTimeline: false });
+                                        setBlockSheetFriend({ userId: actionSheetFriend.user.id, displayName: actionSheetFriend.displayName });
+                                    }}
+                                    style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#27272a", paddingVertical: 12, marginLeft: 6, borderRadius: 10 }}
+                                >
+                                    <Ionicons name="ban-outline" size={18} color={PROFILE_COLORS.text} style={{ marginRight: 6 }} />
+                                    <Text style={{ color: PROFILE_COLORS.text, fontSize: 14 }}>Quản lý chặn</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={{ borderTopWidth: 0.5, borderTopColor: "#27272a", paddingTop: 8 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
+                                    <Ionicons name="person-outline" size={18} color={PROFILE_COLORS.textSecondary} style={{ marginRight: 10 }} />
+                                    <Text style={{ color: PROFILE_COLORS.textSecondary, fontSize: 13 }}>Đã kết bạn</Text>
+                                </View>
+                                <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
+                                    <Ionicons name="people-outline" size={18} color={PROFILE_COLORS.textSecondary} style={{ marginRight: 10 }} />
+                                    <Text style={{ flex: 1, color: PROFILE_COLORS.text, fontSize: 14 }}>Xem nhóm chung (0)</Text>
+                                    <Ionicons name="chevron-forward" size={16} color={PROFILE_COLORS.textSecondary} />
+                                </TouchableOpacity>
+                                <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
+                                    <Ionicons name="time-outline" size={18} color={PROFILE_COLORS.textSecondary} style={{ marginRight: 10 }} />
+                                    <Text style={{ flex: 1, color: PROFILE_COLORS.text, fontSize: 14 }}>Xem nhật ký chung</Text>
+                                    <Ionicons name="chevron-forward" size={16} color={PROFILE_COLORS.textSecondary} />
+                                </TouchableOpacity>
+                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10 }}>
+                                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                        <Ionicons name="star-outline" size={18} color={PROFILE_COLORS.textSecondary} style={{ marginRight: 10 }} />
+                                        <Text style={{ color: PROFILE_COLORS.text, fontSize: 14 }}>Đánh dấu bạn thân</Text>
+                                    </View>
+                                    <Switch
+                                        value={!!(closeFriendCategoryId && friendCategoryMap[actionSheetFriend.user.id] === closeFriendCategoryId)}
+                                        onValueChange={async (v) => {
+                                            if (!closeFriendCategoryId) return;
+                                            if (v) await handleAssignCategory(actionSheetFriend.user.id, closeFriendCategoryId);
+                                            else await handleClearCategory(actionSheetFriend.user.id);
+                                        }}
+                                        trackColor={{ false: "#374151", true: PROFILE_COLORS.primary }}
+                                        thumbColor="#fff"
+                                    />
+                                </View>
+                            </View>
+                            <View style={{ flexDirection: "row", marginTop: 16 }}>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setActionSheetFriend(null);
+                                        handleRemoveFriend(actionSheetFriend.user.id, actionSheetFriend.displayName);
+                                    }}
+                                    style={{ flex: 1, backgroundColor: "#27272a", paddingVertical: 12, borderRadius: 10, alignItems: "center", marginRight: 8 }}
+                                >
+                                    <Text style={{ color: "#f97373", fontSize: 14, fontWeight: "500" }}>Xóa bạn</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        const room = rooms.find((r) => r.type === "PRIVATE" && r.participants?.some((p) => p.id === actionSheetFriend.user.id));
+                                        setActionSheetFriend(null);
+                                        if (room) {
+                                            router.push(`/chat/${room.id}?name=${encodeURIComponent(actionSheetFriend.displayName)}&type=DIRECT` as any);
+                                        }
+                                    }}
+                                    style={{ flex: 1, backgroundColor: PROFILE_COLORS.primary, paddingVertical: 12, borderRadius: 10, alignItems: "center" }}
+                                >
+                                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "500" }}>Nhắn tin</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </Modal>
+            )}
+
+            {/* Sheet Quản lý chặn */}
+            {blockSheetFriend && (
+                <Modal transparent visible animationType="slide" onRequestClose={() => setBlockSheetFriend(null)}>
+                    <TouchableOpacity activeOpacity={1} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }} onPress={() => setBlockSheetFriend(null)}>
+                        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ backgroundColor: "#18181b", borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}>
+                            <Text style={{ color: PROFILE_COLORS.text, fontSize: 17, fontWeight: "600", marginBottom: 16 }}>
+                                Quản lý chặn {blockSheetFriend.displayName}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setBlockOptions((o) => ({ ...o, blockMessages: !o.blockMessages }))}
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: "#27272a" }}
+                            >
+                                <Ionicons name="chatbubble-outline" size={20} color={PROFILE_COLORS.textSecondary} style={{ marginRight: 12 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: PROFILE_COLORS.text, fontSize: 14 }}>Chặn tin nhắn</Text>
+                                    <Text style={{ color: PROFILE_COLORS.textSecondary, fontSize: 12, marginTop: 2 }}>Cả hai sẽ không thể nhắn tin cho nhau</Text>
+                                </View>
+                                {blockOptions.blockMessages ? <Ionicons name="checkmark-circle" size={22} color={PROFILE_COLORS.primary} /> : <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: "#4b5563" }} />}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setBlockOptions((o) => ({ ...o, blockCalls: !o.blockCalls }))}
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: "#27272a" }}
+                            >
+                                <Ionicons name="call-outline" size={20} color={PROFILE_COLORS.textSecondary} style={{ marginRight: 12 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: PROFILE_COLORS.text, fontSize: 14 }}>Chặn cuộc gọi</Text>
+                                    <Text style={{ color: PROFILE_COLORS.textSecondary, fontSize: 12, marginTop: 2 }}>Cả hai sẽ không thể gọi điện cho nhau</Text>
+                                </View>
+                                {blockOptions.blockCalls ? <Ionicons name="checkmark-circle" size={22} color={PROFILE_COLORS.primary} /> : <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: "#4b5563" }} />}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setBlockOptions((o) => ({ ...o, blockTimeline: !o.blockTimeline }))}
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: "#27272a" }}
+                            >
+                                <Ionicons name="time-outline" size={20} color={PROFILE_COLORS.textSecondary} style={{ marginRight: 12 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: PROFILE_COLORS.text, fontSize: 14 }}>Chặn và ẩn khỏi nhật ký</Text>
+                                </View>
+                                {blockOptions.blockTimeline ? <Ionicons name="checkmark-circle" size={22} color={PROFILE_COLORS.primary} /> : <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: "#4b5563" }} />}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={async () => {
+                                    const any = blockOptions.blockMessages || blockOptions.blockCalls || blockOptions.blockTimeline;
+                                    if (!any) return;
+                                    try {
+                                        await friendService.blockUser(blockSheetFriend.userId);
+                                        useFriendStore.setState((prev) => ({
+                                            friends: prev.friends.filter((f) => f.user.id !== blockSheetFriend.userId && f.friend.id !== blockSheetFriend.userId),
+                                        }));
+                                        setBlockSheetFriend(null);
+                                        setActionSheetFriend(null);
+                                        Alert.alert("Đã chặn", "Người này đã bị chặn và ẩn khỏi danh sách bạn.");
+                                    } catch {
+                                        Alert.alert("Lỗi", "Không chặn được người này.");
+                                    }
+                                }}
+                                style={{ marginTop: 16, backgroundColor: (blockOptions.blockMessages || blockOptions.blockCalls || blockOptions.blockTimeline) ? "#374151" : "#27272a", paddingVertical: 14, borderRadius: 10, alignItems: "center" }}
+                            >
+                                <Text style={{ color: (blockOptions.blockMessages || blockOptions.blockCalls || blockOptions.blockTimeline) ? PROFILE_COLORS.text : PROFILE_COLORS.textSecondary, fontSize: 15, fontWeight: "500" }}>Áp dụng</Text>
+                            </TouchableOpacity>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </Modal>
+            )}
+
+            {/* Modal + Thêm (thêm vào Bạn thân) */}
+            {addToCloseFriendsVisible && closeFriendCategoryId && (
+                <Modal transparent visible animationType="slide" onRequestClose={() => setAddToCloseFriendsVisible(false)}>
+                    <TouchableOpacity activeOpacity={1} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }} onPress={() => setAddToCloseFriendsVisible(false)}>
+                        <View style={{ backgroundColor: "#18181b", borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, maxHeight: "60%" }}>
+                            <Text style={{ color: PROFILE_COLORS.text, fontSize: 16, fontWeight: "600", marginBottom: 12 }}>Thêm vào Bạn thân</Text>
+                            <ScrollView style={{ maxHeight: 320 }}>
+                                {friends
+                                    .map((f) => getFriendUser(f, currentUser?.id))
+                                    .filter((u) => friendCategoryMap[u.id] !== closeFriendCategoryId)
+                                    .sort((a, b) => (a.displayName || a.username || "").localeCompare(b.displayName || b.username || "", "vi"))
+                                    .map((u) => (
+                                        <TouchableOpacity
+                                            key={u.id}
+                                            onPress={async () => {
+                                                await handleAssignCategory(u.id, closeFriendCategoryId);
+                                                setAddToCloseFriendsVisible(false);
+                                            }}
+                                            style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: "#27272a" }}
+                                        >
+                                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#2f3134", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                                <Text style={{ color: PROFILE_COLORS.text, fontWeight: "600", fontSize: 16 }}>
+                                                    {((u.displayName || u.username || "?").charAt(0).toUpperCase() || "?").toUpperCase()}
+                                                </Text>
+                                            </View>
+                                            <Text style={{ color: PROFILE_COLORS.text, fontSize: 15 }} numberOfLines={1}>{u.displayName || u.username || "Người dùng"}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                            </ScrollView>
+                            <TouchableOpacity onPress={() => setAddToCloseFriendsVisible(false)} style={{ marginTop: 12, paddingVertical: 10 }}>
+                                <Text style={{ color: PROFILE_COLORS.textSecondary, fontSize: 14, textAlign: "center" }}>Đóng</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
+                    </TouchableOpacity>
                 </Modal>
             )}
 
@@ -1160,6 +1109,7 @@ export default function FriendsListMobile({ searchText = "" }: FriendsListMobile
                 </Modal>
             )}
         </View>
+        </GestureHandlerRootView>
     );
 }
 
