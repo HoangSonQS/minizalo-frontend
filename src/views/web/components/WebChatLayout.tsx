@@ -8,6 +8,7 @@ import { ChatRoom } from '@/shared/types';
 import { chatService, ChatRoomResponse } from '@/shared/services/chatService';
 import { useAuthStore } from '@/shared/store/authStore';
 import { webSocketService } from '@/shared/services/WebSocketService';
+import { useThemeStore } from '@/shared/store/themeStore';
 
 interface WebChatLayoutProps {
     children: React.ReactNode;
@@ -19,6 +20,8 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
     const { rooms, setRooms } = useChatStore();
     const { accessToken } = useAuthStore();
     const { openCreateGroup } = useGroupStore();
+    const theme = useThemeStore((s) => s.theme);
+    const isDark = theme === 'dark';
 
     // Track which room IDs we've already subscribed to, to avoid re-subscribing
     const subscribedRoomIds = useRef<Set<string>>(new Set());
@@ -39,13 +42,13 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
                         type: r.type === 'DIRECT' ? 'PRIVATE' : 'GROUP',
                         lastMessage: r.lastMessage
                             ? {
-                                  id: r.lastMessage.messageId,
-                                  senderId: r.lastMessage.senderId,
-                                  roomId: r.id,
-                                  content: r.lastMessage.content,
-                                  type: (r.lastMessage.type as any) || 'TEXT',
-                                  createdAt: r.lastMessage.createdAt,
-                              }
+                                id: r.lastMessage.messageId,
+                                senderId: r.lastMessage.senderId,
+                                roomId: r.id,
+                                content: r.lastMessage.content,
+                                type: (r.lastMessage.type as any) || 'TEXT',
+                                createdAt: r.lastMessage.createdAt,
+                            }
                             : undefined,
                         unreadCount: Math.max(existing ? existing.unreadCount : 0, r.unreadCount || 0),
                         participants: (r.members || []).map((m: any) => ({
@@ -104,7 +107,7 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
             subscribedRoomIds.current.add(room.id);
         });
 
-        return () => {};
+        return () => { };
     }, [rooms.length]);
 
     // Cleanup khi unmount hoàn toàn
@@ -118,18 +121,54 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
     }, []);
 
     return (
-        <div className="flex h-screen bg-white">
+        <div
+            className="flex h-screen"
+            style={{
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                transition: 'background-color 0.3s ease, color 0.3s ease',
+            }}
+        >
             {/* Sidebar */}
-            <div className="w-[350px] flex flex-col border-r border-gray-200">
+            <div
+                className="w-[350px] flex flex-col"
+                style={{
+                    borderRight: `1px solid var(--border-primary)`,
+                    backgroundColor: 'var(--bg-primary)',
+                    transition: 'background-color 0.3s ease, border-color 0.3s ease',
+                }}
+            >
                 {/* Header sidebar */}
-                <div className="h-12 flex items-center justify-between px-4 border-b border-gray-200 bg-white shadow-sm shrink-0">
-                    <span className="font-bold text-lg">Tin nhắn</span>
+                <div
+                    className="h-12 flex items-center justify-between px-4 shrink-0"
+                    style={{
+                        borderBottom: `1px solid var(--border-primary)`,
+                        backgroundColor: 'var(--bg-primary)',
+                        boxShadow: 'var(--shadow-sm)',
+                        transition: 'background-color 0.3s ease',
+                    }}
+                >
+                    <span
+                        className="font-bold text-lg"
+                        style={{ color: 'var(--text-primary)' }}
+                    >
+                        Tin nhắn
+                    </span>
 
                     {/* Nút tạo nhóm */}
                     <button
                         onClick={openCreateGroup}
                         title="Tạo nhóm mới"
-                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+                        className="w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+                        style={{ color: 'var(--text-tertiary)' }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDark
+                                ? 'rgba(255,255,255,0.08)'
+                                : 'rgba(0,0,0,0.06)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round"
@@ -148,7 +187,13 @@ const WebChatLayout: React.FC<WebChatLayoutProps> = ({ children, selectedRoomId,
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
+            <div
+                className="flex-1 flex flex-col min-w-0"
+                style={{
+                    backgroundColor: 'var(--bg-secondary)',
+                    transition: 'background-color 0.3s ease',
+                }}
+            >
                 {children}
             </div>
 

@@ -6,6 +6,7 @@ type FriendState = {
     friends: FriendResponseDto[];
     requests: FriendResponseDto[];
     sentRequests: FriendResponseDto[];
+    blockedUsers: FriendResponseDto[];
     loading: boolean;
     error: string | null;
     fetchFriends: () => Promise<void>;
@@ -16,6 +17,9 @@ type FriendState = {
     rejectRequest: (requestId: string) => Promise<void>;
     cancelSentRequest: (requestId: string) => Promise<void>;
     removeFriend: (friendId: string) => Promise<void>;
+    blockUser: (userId: string) => Promise<void>;
+    unblockUser: (userId: string) => Promise<void>;
+    fetchBlockedUsers: () => Promise<void>;
     clearError: () => void;
 };
 
@@ -32,6 +36,7 @@ export const useFriendStore = create<FriendState>((set, get) => ({
     friends: [],
     requests: [],
     sentRequests: [],
+    blockedUsers: [],
     loading: false,
     error: null,
 
@@ -152,6 +157,56 @@ export const useFriendStore = create<FriendState>((set, get) => ({
                 error: extractErrorMessage(e, "Xóa bạn thất bại."),
             });
             throw e;
+        }
+    },
+
+    blockUser: async (userId: string) => {
+        set({ error: null });
+        try {
+            await friendService.blockUser(userId);
+            // Do NOT remove from friends list - friendship is preserved
+            // Just reload blocked users list
+            try {
+                const blockedUsers = await friendService.getBlockedUsers();
+                set({ blockedUsers });
+            } catch {
+                // ignore reload error
+            }
+        } catch (e: unknown) {
+            set({
+                error: extractErrorMessage(e, "Chặn người dùng thất bại."),
+            });
+            throw e;
+        }
+    },
+
+    unblockUser: async (userId: string) => {
+        set({ error: null });
+        try {
+            await friendService.unblockUser(userId);
+            set({
+                blockedUsers: get().blockedUsers.filter(
+                    (f) => f.friend.id !== userId
+                ),
+            });
+        } catch (e: unknown) {
+            set({
+                error: extractErrorMessage(e, "Bỏ chặn người dùng thất bại."),
+            });
+            throw e;
+        }
+    },
+
+    fetchBlockedUsers: async () => {
+        set({ loading: true, error: null });
+        try {
+            const blockedUsers = await friendService.getBlockedUsers();
+            set({ blockedUsers, loading: false });
+        } catch (e: unknown) {
+            set({
+                loading: false,
+                error: extractErrorMessage(e, "Không tải được danh sách chặn."),
+            });
         }
     },
 

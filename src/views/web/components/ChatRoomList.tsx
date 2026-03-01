@@ -11,16 +11,22 @@ interface ChatRoomListProps {
 
 const ChatRoomList: React.FC<ChatRoomListProps> = ({ rooms, selectedRoomId, onSelectRoom }) => {
     return (
-        <List className="bg-white h-full overflow-y-auto">
+        <List
+            className="h-full overflow-y-auto"
+            style={{
+                backgroundColor: 'var(--bg-primary)',
+                transition: 'background-color 0.3s ease',
+            }}
+        >
             {rooms.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">
+                <div className="p-4 text-center" style={{ color: 'var(--text-muted)' }}>
                     Chưa có cuộc trò chuyện nào
                 </div>
             ) : (
                 rooms.map((room) => (
-                    <ChatRoomItem 
-                        key={room.id} 
-                        room={room} 
+                    <ChatRoomItem
+                        key={room.id}
+                        room={room}
                         isActive={selectedRoomId === room.id}
                         onSelect={onSelectRoom}
                     />

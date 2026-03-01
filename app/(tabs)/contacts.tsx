@@ -1,30 +1,34 @@
 import React, { useState } from "react";
 import { View, Text, Platform, ScrollView } from "react-native";
 import { useUserStore } from "@/shared/store/userStore";
+import { useThemeStore } from "@/shared/store/themeStore";
 import FriendsListScreen from "@/views/web/components/FriendsListScreen";
 import FriendRequestsScreen from "@/views/web/components/FriendRequestsScreen";
 import SearchUsersScreen from "@/views/web/components/SearchUsersScreen";
+import BlockedUsersScreen from "@/views/web/components/BlockedUsersScreen";
 import ContactsMobileScreen from "@/views/mobile/contacts/ContactsMobileScreen";
 
 export default function ContactsScreen() {
   const isWeb = Platform.OS === "web";
   const { profile } = useUserStore();
   const currentUserId = profile?.id ?? null;
+  const theme = useThemeStore((s) => s.theme);
+  const isDark = theme === "dark";
 
   const [activeNav, setActiveNav] = useState<
-    "friends" | "groups" | "friendRequests" | "groupInvites"
+    "friends" | "groups" | "friendRequests" | "groupInvites" | "blocked"
   >("friends");
   const [globalSearch, setGlobalSearch] = useState("");
 
   if (isWeb) {
-    // Bản web: layout danh bạ theo kiểu Zalo Web (sidebar bên trái + nội dung chính)
     return (
       <div
         style={{
           display: "flex",
           height: "100vh",
           maxHeight: "100%",
-          backgroundColor: "#e5e7eb",
+          backgroundColor: isDark ? "var(--bg-secondary)" : "#e5e7eb",
+          transition: "background-color 0.3s ease",
         }}
       >
         {/* Sidebar trái: menu danh bạ giống Zalo */}
@@ -33,15 +37,16 @@ export default function ContactsScreen() {
             width: 400,
             minWidth: 400,
             maxWidth: 500,
-            backgroundColor: "#f9fafb",
-            borderRight: "1px solid #e5e7eb",
+            backgroundColor: "var(--bg-primary)",
+            borderRight: "1px solid var(--border-primary)",
             display: "flex",
             flexDirection: "column",
             padding: 12,
             gap: 12,
+            transition: "background-color 0.3s ease, border-color 0.3s ease",
           }}
         >
-          {/* Ô tìm kiếm bạn (tìm user theo SĐT / tên qua backend) */}
+          {/* Ô tìm kiếm bạn */}
           <div
             style={{
               display: "flex",
@@ -53,14 +58,15 @@ export default function ContactsScreen() {
               style={{
                 padding: 8,
                 borderRadius: 999,
-                backgroundColor: "#fff",
-                border: "1px solid #e5e7eb",
+                backgroundColor: isDark ? "var(--bg-tertiary)" : "#fff",
+                border: "1px solid var(--border-primary)",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 fontSize: 13,
-                color: "#6b7280",
+                color: "var(--text-tertiary)",
                 flex: 1,
+                transition: "background-color 0.3s ease, border-color 0.3s ease",
               }}
             >
               <span style={{ fontSize: 16, marginRight: 4 }}>🔍</span>
@@ -75,6 +81,7 @@ export default function ContactsScreen() {
                   outline: "none",
                   fontSize: 13,
                   backgroundColor: "transparent",
+                  color: "var(--text-primary)",
                 }}
               />
             </div>
@@ -84,7 +91,7 @@ export default function ContactsScreen() {
               style={{
                 border: "none",
                 background: "none",
-                color: "#111827",
+                color: "var(--text-primary)",
                 fontSize: 13,
                 cursor: "pointer",
                 padding: "4px 6px",
@@ -98,21 +105,16 @@ export default function ContactsScreen() {
           <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {[
               { id: "friends" as const, label: "Danh sách bạn bè", icon: "👥" },
-              // {
-              //   id: "groups" as const,
-              //   label: "Danh sách nhóm và cộng đồng",
-              //   icon: "👥",
-              // },
               {
                 id: "friendRequests" as const,
                 label: "Lời mời kết bạn",
                 icon: "💌",
               },
-              // {
-              //   id: "groupInvites" as const,
-              //   label: "Lời mời vào nhóm và cộng đồng",
-              //   icon: "📩",
-              // },
+              {
+                id: "blocked" as const,
+                label: "Danh sách chặn",
+                icon: "🚫",
+              },
             ].map((item) => {
               const active = activeNav === item.id;
               return (
@@ -128,11 +130,16 @@ export default function ContactsScreen() {
                     padding: "8px 10px",
                     borderRadius: 10,
                     border: "none",
-                    backgroundColor: active ? "#e0edff" : "transparent",
-                    color: active ? "#2563eb" : "#374151",
+                    backgroundColor: active
+                      ? (isDark ? "rgba(137,180,250,0.15)" : "#e0edff")
+                      : "transparent",
+                    color: active
+                      ? "var(--accent)"
+                      : "var(--text-secondary)",
                     cursor: "pointer",
                     fontSize: 14,
                     textAlign: "left" as const,
+                    transition: "background-color 0.15s ease, color 0.15s ease",
                   }}
                 >
                   <span>{item.icon}</span>
@@ -159,43 +166,45 @@ export default function ContactsScreen() {
             style={{
               width: "100%",
               maxWidth: 1500,
-              backgroundColor: "#fff",
+              backgroundColor: "var(--bg-primary)",
               borderRadius: 16,
-              boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
+              boxShadow: "var(--shadow-lg)",
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
               height: "100%",
               maxHeight: "calc(100vh - 32px)",
+              transition: "background-color 0.3s ease",
             }}
           >
             {activeNav === "friends" &&
               (globalSearch.trim() === "" ? (
                 <FriendsListScreen
                   currentUserId={currentUserId}
-                  // TODO: nối với màn chat khi có
-                  onOpenChat={() => {}}
+                  onOpenChat={() => { }}
                 />
               ) : (
                 <SearchUsersScreen
                   externalQuery={globalSearch}
                   hideSearchInput
-                  // TODO: nối với màn chat khi có
-                  onOpenChat={() => {}}
+                  onOpenChat={() => { }}
                 />
               ))}
             {activeNav === "friendRequests" && (
               <FriendRequestsScreen currentUserId={currentUserId} />
             )}
             {activeNav === "groups" && (
-              <div style={{ padding: 24, fontSize: 14, color: "#6b7280" }}>
+              <div style={{ padding: 24, fontSize: 14, color: "var(--text-tertiary)" }}>
                 Danh sách nhóm và cộng đồng sẽ được phát triển sau.
               </div>
             )}
             {activeNav === "groupInvites" && (
-              <div style={{ padding: 24, fontSize: 14, color: "#6b7280" }}>
+              <div style={{ padding: 24, fontSize: 14, color: "var(--text-tertiary)" }}>
                 Lời mời vào nhóm và cộng đồng sẽ được phát triển sau.
               </div>
+            )}
+            {activeNav === "blocked" && (
+              <BlockedUsersScreen currentUserId={currentUserId} />
             )}
           </div>
         </main>
@@ -203,6 +212,6 @@ export default function ContactsScreen() {
     );
   }
 
-  // Bản mobile: dùng ContactsMobileScreen với UI & chức năng đầy đủ
+  // Bản mobile: dùng ContactsMobileScreen
   return <ContactsMobileScreen />;
 }
