@@ -31,9 +31,17 @@ const HomeWeb = () => {
             {selectedRoomId ? (
                 <ChatWindow roomId={selectedRoomId} key={selectedRoomId} />
             ) : (
-                <div className="flex-1 flex items-center justify-center text-gray-500 min-h-full">
+                <div
+                    className="flex-1 flex items-center justify-center min-h-full"
+                    style={{ color: 'var(--text-tertiary)' }}
+                >
                     <div className="text-center">
-                        <h3 className="text-xl font-medium mb-2">Chào mừng đến với MiniZalo</h3>
+                        <h3
+                            className="text-xl font-medium mb-2"
+                            style={{ color: 'var(--text-primary)' }}
+                        >
+                            Chào mừng đến với MiniZalo
+                        </h3>
                         <p>Chọn một cuộc trò chuyện để bắt đầu nhắn tin.</p>
                     </div>
                 </div>

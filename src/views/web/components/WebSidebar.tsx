@@ -3,10 +3,9 @@ import { useRouter, usePathname } from "expo-router";
 import { useUserStore } from "@/shared/store/userStore";
 import { useAuthStore } from "@/shared/store/authStore";
 import { useChatStore } from "@/shared/store/useChatStore";
+import { useThemeStore } from "@/shared/store/themeStore";
 import SettingsPanel from "./SettingsPanel";
 
-const SIDEBAR_BG = "#004A99";
-const ACTIVE_BG = "rgba(255,255,255,0.18)";
 const ICON_SIZE = 24;
 
 const iconMessage = (
@@ -67,6 +66,11 @@ export default function WebSidebar() {
     const hasToken = !!useAuthStore((s) => s.accessToken);
     const { profile, fetchProfile } = useUserStore();
     const totalUnread = useChatStore((s) => s.rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0));
+    const theme = useThemeStore((s) => s.theme);
+    const isDark = theme === "dark";
+
+    const SIDEBAR_BG = isDark ? "var(--bg-sidebar)" : "#004A99";
+    const ACTIVE_BG = "var(--bg-sidebar-active)";
 
     useEffect(() => {
         if (hasToken && !profile) fetchProfile();
@@ -83,116 +87,117 @@ export default function WebSidebar() {
 
     return (
         <div style={{ display: "flex", flexShrink: 0 }}>
-        <aside
-            style={{
-                width: 72,
-                minWidth: 72,
-                backgroundColor: SIDEBAR_BG,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                paddingTop: 16,
-                paddingBottom: 16,
-                gap: 4,
-                flexShrink: 0,
-            }}
-        >
-            {/* Avatar người dùng */}
-            <button
-                type="button"
-                onClick={() => router.push("/(tabs)/account")}
+            <aside
                 style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: "50%",
-                    marginBottom: 12,
-                    overflow: "hidden",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
+                    width: 72,
+                    minWidth: 72,
+                    backgroundColor: SIDEBAR_BG,
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: avatarUrl ? "transparent" : "rgba(255,255,255,0.25)",
-                    color: "#fff",
-                    fontSize: 18,
-                    fontWeight: 600,
+                    paddingTop: 16,
+                    paddingBottom: 16,
+                    gap: 4,
+                    flexShrink: 0,
+                    transition: "background-color 0.3s ease",
                 }}
             >
-                {avatarUrl ? (
-                    <img
-                        src={avatarUrl}
-                        alt="Avatar"
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                ) : (
-                    initial
-                )}
-            </button>
+                {/* Avatar người dùng */}
+                <button
+                    type="button"
+                    onClick={() => router.push("/(tabs)/account")}
+                    style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: "50%",
+                        marginBottom: 12,
+                        overflow: "hidden",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: avatarUrl ? "transparent" : "rgba(255,255,255,0.25)",
+                        color: "#fff",
+                        fontSize: 18,
+                        fontWeight: 600,
+                    }}
+                >
+                    {avatarUrl ? (
+                        <img
+                            src={avatarUrl}
+                            alt="Avatar"
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                    ) : (
+                        initial
+                    )}
+                </button>
 
-            {/* Tin nhắn - luôn đầu, active khi đang ở tabs */}
-            <NavItem
-                href="/(tabs)"
-                label="Tin nhắn"
-                icon={iconMessage}
-                active={isActive("/(tabs)")}
-                onClick={() => router.push("/(tabs)")}
-                badge={totalUnread}
-            />
-
-            {/* Danh bạ */}
-            <NavItem
-                href="/(tabs)/contacts"
-                label="Danh bạ"
-                icon={iconContacts}
-                active={isActive("/(tabs)/contacts")}
-                onClick={() => router.push("/(tabs)/contacts")}
-            />
-
-            {/* Khoảng trống giữa */}
-            <div style={{ flex: 1, minHeight: 24 }} />
-
-            {/* Zalo Cloud, Thư mục, Khám phá, Công việc */}
-            {navItems.slice(2).map((item) => (
+                {/* Tin nhắn - luôn đầu, active khi đang ở tabs */}
                 <NavItem
-                    key={item.href}
-                    href={item.href}
-                    label={item.label}
-                    icon={item.icon}
-                    active={isActive(item.href)}
-                    onClick={() => router.push(item.href as any)}
+                    label="Tin nhắn"
+                    icon={iconMessage}
+                    active={isActive("/(tabs)")}
+                    activeBg={ACTIVE_BG}
+                    onClick={() => router.push("/(tabs)")}
+                    badge={totalUnread}
                 />
-            ))}
 
-            {/* Cài đặt - mở panel thay vì chuyển trang */}
-            <NavItem
-                href="/(tabs)/settings"
-                label="Cài đặt"
-                icon={iconSettings}
-                active={showSettingsPanel}
-                onClick={() => setShowSettingsPanel((v) => !v)}
-            />
-        </aside>
+                {/* Danh bạ */}
+                <NavItem
+                    label="Danh bạ"
+                    icon={iconContacts}
+                    active={isActive("/(tabs)/contacts")}
+                    activeBg={ACTIVE_BG}
+                    onClick={() => router.push("/(tabs)/contacts")}
+                />
 
-        {showSettingsPanel && (
-            <SettingsPanel onClose={() => setShowSettingsPanel(false)} />
-        )}
+                {/* Khoảng trống giữa */}
+                <div style={{ flex: 1, minHeight: 24 }} />
+
+                {/* Zalo Cloud, Thư mục, Khám phá, Công việc */}
+                {navItems.slice(2).map((item) => (
+                    <NavItem
+                        key={item.href}
+                        label={item.label}
+                        icon={item.icon}
+                        active={isActive(item.href)}
+                        activeBg={ACTIVE_BG}
+                        onClick={() => router.push(item.href as any)}
+                    />
+                ))}
+
+                {/* Cài đặt - mở panel thay vì chuyển trang */}
+                <NavItem
+                    label="Cài đặt"
+                    icon={iconSettings}
+                    active={showSettingsPanel}
+                    activeBg={ACTIVE_BG}
+                    onClick={() => setShowSettingsPanel((v) => !v)}
+                />
+            </aside>
+
+            {showSettingsPanel && (
+                <SettingsPanel onClose={() => setShowSettingsPanel(false)} />
+            )}
         </div>
     );
 }
 
 function NavItem({
-    href,
     label,
     icon,
     active,
+    activeBg,
     onClick,
     badge,
 }: {
-    href: string;
     label: string;
     icon: React.ReactNode;
     active: boolean;
+    activeBg: string;
     onClick: () => void;
     badge?: number;
 }) {
@@ -206,16 +211,17 @@ function NavItem({
                 height: 44,
                 borderRadius: 12,
                 border: "none",
-                background: active ? ACTIVE_BG : "transparent",
+                background: active ? activeBg : "transparent",
                 color: "#fff",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 position: "relative",
+                transition: "background 0.2s ease",
             }}
             onMouseEnter={(e) => {
-                if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                if (!active) e.currentTarget.style.background = "var(--bg-sidebar-hover)";
             }}
             onMouseLeave={(e) => {
                 if (!active) e.currentTarget.style.background = "transparent";

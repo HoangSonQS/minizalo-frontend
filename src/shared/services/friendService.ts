@@ -132,7 +132,19 @@ export const friendService = {
         });
         return data;
     },
+
+    async checkBlockStatus(userId: string): Promise<{
+        blockedByYou: boolean;
+        blockedByOther: boolean;
+        blockerName: string | null;
+    }> {
+        const { data } = await api.get(`/friends/block-status/${userId}`, {
+            headers: getAuthHeaders(),
+        });
+        return data;
+    },
 };
 
 export default friendService;
+
 

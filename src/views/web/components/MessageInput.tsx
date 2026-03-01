@@ -68,7 +68,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSend, onSendFile, onSendL
     const hasContent = text.trim().length > 0 || !!selectedFile;
 
     return (
-        <Box className="flex flex-col bg-white border-t border-gray-200">
+        <Box className="flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', borderTop: '1px solid var(--border-primary)', transition: 'background-color 0.3s ease' }}>
             {/* Reply preview */}
             {replyingTo && (
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">

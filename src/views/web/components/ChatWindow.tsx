@@ -7,11 +7,13 @@ import DirectChatInfoPanel from './DirectChatInfoPanel';
 import AddMembersModal from './AddMembersModal';
 import { useChatStore } from '@/shared/store/useChatStore';
 import { useGroupStore } from '@/shared/store/useGroupStore';
+import { useFriendStore } from '@/shared/store/friendStore';
 import { Message } from '@/shared/types';
 import { webSocketService } from '@/shared/services/WebSocketService';
 import { chatService, MessageDynamo } from '@/shared/services/chatService';
 import { useAuthStore } from '@/shared/store/authStore';
 import { MessageService } from '@/shared/services/MessageService';
+import friendService from '@/shared/services/friendService';
 
 interface ChatWindowProps {
     roomId: string;
@@ -48,6 +50,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [isSendingFile, setIsSendingFile] = useState(false);
     const [showPinnedMenu, setShowPinnedMenu] = useState(false);
+    const [blockStatus, setBlockStatus] = useState<{
+        blockedByYou: boolean;
+        blockedByOther: boolean;
+        blockerName: string | null;
+    } | null>(null);
     const messagesState = messages[roomId] || [];
 
     const currentRoom = rooms.find((r) => r.id === roomId);
@@ -61,6 +68,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
     const partner = !isGroupRoom
         ? currentRoom?.participants?.find((p) => p.id !== currentUserId)
         : undefined;
+
+    const isBlocked = blockStatus?.blockedByYou || blockStatus?.blockedByOther || false;
 
     const fetchHistory = useCallback(async () => {
         if (!roomId) return;
@@ -166,6 +175,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
         // Đóng panel info khi chuyển phòng
         setIsInfoOpen(false);
         closeGroupInfo();
+        setBlockStatus(null);
+
+        // Check block status for DIRECT rooms
+        if (!isGroupRoom && partner?.id) {
+            friendService.checkBlockStatus(partner.id)
+                .then((status) => setBlockStatus(status))
+                .catch((err) => console.error('Failed to check block status:', err));
+        }
+
         return () => {
             webSocketService.unsubscribe(recallTopic);
             webSocketService.unsubscribe(reactionTopic);
@@ -173,6 +191,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
             setCurrentRoom(null);
         };
     }, [roomId, fetchHistory]);
+
+    // Auto-refresh block status when blockedUsers changes (block/unblock from any screen)
+    const blockedUsers = useFriendStore((s) => s.blockedUsers);
+    useEffect(() => {
+        if (!isGroupRoom && partner?.id) {
+            friendService.checkBlockStatus(partner.id)
+                .then((status) => setBlockStatus(status))
+                .catch((err) => console.error('Failed to re-check block status:', err));
+        }
+    }, [blockedUsers, partner?.id, isGroupRoom]);
 
     const handleSend = async (text: string) => {
         if (!roomId || !text.trim()) return;
@@ -376,17 +404,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
     const infoOpen = isGroupRoom ? isGroupInfoOpen : isInfoOpen;
 
     return (
-        <div className="flex h-full bg-white overflow-hidden">
+        <div className="flex h-full overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', transition: 'background-color 0.3s ease' }}>
             {/* ── Chat area ── */}
             <div className="flex flex-col flex-1 min-w-0">
                 {/* Header */}
-                <div className="h-16 flex items-center px-4 border-b border-gray-200 bg-white shadow-sm shrink-0 justify-between">
+                <div className="h-16 flex items-center px-4 shrink-0 justify-between" style={{ borderBottom: '1px solid var(--border-primary)', backgroundColor: 'var(--bg-primary)', boxShadow: 'var(--shadow-sm)', transition: 'background-color 0.3s ease' }}>
                     <div className="flex items-center gap-3 min-w-0">
                         <Avatar src={roomAvatar} />
                         <div className="min-w-0">
-                            <span className="font-bold text-base block truncate">{roomName}</span>
+                            <span className="font-bold text-base block truncate" style={{ color: 'var(--text-primary)' }}>{roomName}</span>
                             {isGroupRoom && currentRoom && (
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                                     {currentRoom.participants?.length || 0} thành viên
                                 </span>
                             )}
@@ -488,7 +516,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
                 })()}
 
                 {/* Messages + Input */}
-                <Box className="flex-1 overflow-hidden flex flex-col bg-white">
+                <Box className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', transition: 'background-color 0.3s ease' }}>
                     <MessageList
                         messages={messagesState}
                         currentUserId={currentUserId}
@@ -500,15 +528,56 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
                         onRemoveAllReactions={handleRemoveAllReactions}
                         onDeleteForMe={handleDeleteForMe}
                     />
-                    <MessageInput
-                        onSend={handleSend}
-                        onSendFile={handleSendFile}
-                        onSendLike={() => handleSend('👍')}
-                        onTyping={handleTyping}
-                        replyingTo={replyingTo}
-                        onCancelReply={handleCancelReply}
-                        isSendingFile={isSendingFile}
-                    />
+
+                    {/* Blocked chat overlay */}
+                    {isBlocked ? (
+                        <div className="border-t border-gray-200 bg-gray-50">
+                            {blockStatus?.blockedByYou ? (
+                                <div className="flex flex-col items-center justify-center py-6 px-4 gap-3">
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                        <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                        </svg>
+                                        <span className="text-sm font-medium">Bạn đã chặn liên hệ này</span>
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            if (partner?.id) {
+                                                try {
+                                                    await useFriendStore.getState().unblockUser(partner.id);
+                                                    setBlockStatus({ blockedByYou: false, blockedByOther: false, blockerName: null });
+                                                } catch {
+                                                    // error in store
+                                                }
+                                            }
+                                        }}
+                                        className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-full transition-colors"
+                                    >
+                                        Bỏ chặn
+                                    </button>
+                                </div>
+                            ) : blockStatus?.blockedByOther ? (
+                                <div className="flex items-center justify-center py-6 px-4 gap-2 text-gray-500">
+                                    <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                    <span className="text-sm font-medium">
+                                        {blockStatus.blockerName || roomName} đã chặn tin nhắn
+                                    </span>
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : (
+                        <MessageInput
+                            onSend={handleSend}
+                            onSendFile={handleSendFile}
+                            onSendLike={() => handleSend('👍')}
+                            onTyping={handleTyping}
+                            replyingTo={replyingTo}
+                            onCancelReply={handleCancelReply}
+                            isSendingFile={isSendingFile}
+                        />
+                    )}
                 </Box>
             </div>
 

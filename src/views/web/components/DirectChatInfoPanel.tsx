@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CollapsibleSection, ActionButton, ActionButtonRow } from './ChatInfoHelpers';
 import { useGroupStore } from '@/shared/store/useGroupStore';
 import { useChatStore } from '@/shared/store/useChatStore';
+import { useFriendStore } from '@/shared/store/friendStore';
 import { ChatRoom } from '@/shared/types';
 import ConfirmModal from './ConfirmModal';
 
@@ -19,13 +20,16 @@ const GroupAddIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 
 const ClockIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const ImageIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>;
 const AlertIcon = () => <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>;
+const BlockIcon = () => <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>;
 const TrashIcon = () => <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>;
 
 const DirectChatInfoPanel: React.FC<DirectChatInfoPanelProps> = ({ room, onClose, partner }) => {
     const { openCreateGroup } = useGroupStore();
+    const { blockUser } = useFriendStore();
     const [autoDeleteMsg] = useState('Không bao giờ');
     const [hideConversation, setHideConversation] = useState(false);
     const [isClearHistoryModalOpen, setIsClearHistoryModalOpen] = useState(false);
+    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
 
     const displayName = partner?.fullName || partner?.username || room.name || 'Người dùng';
     const avatarSrc = partner?.avatarUrl ||
@@ -68,7 +72,7 @@ const DirectChatInfoPanel: React.FC<DirectChatInfoPanelProps> = ({ room, onClose
             <ActionButtonRow>
                 <ActionButton icon={<BellIcon />} label="Tắt thông báo" />
                 <ActionButton icon={<PinIcon />} label="Ghim hội thoại" />
-                <ActionButton icon={<GroupAddIcon />} label={<span>Tạo nhóm<br/>trò chuyện</span> as any}
+                <ActionButton icon={<GroupAddIcon />} label={<span>Tạo nhóm<br />trò chuyện</span> as any}
                     onClick={() => { onClose(); openCreateGroup(); }} />
             </ActionButtonRow>
 
@@ -160,6 +164,11 @@ const DirectChatInfoPanel: React.FC<DirectChatInfoPanelProps> = ({ room, onClose
                     <AlertIcon />
                     <span className="text-sm text-gray-600">Báo xấu</span>
                 </button>
+                <button onClick={() => setIsBlockModalOpen(true)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition-colors">
+                    <BlockIcon />
+                    <span className="text-sm text-red-500">Chặn người này</span>
+                </button>
                 <button onClick={() => setIsClearHistoryModalOpen(true)}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition-colors">
                     <TrashIcon />
@@ -168,6 +177,23 @@ const DirectChatInfoPanel: React.FC<DirectChatInfoPanelProps> = ({ room, onClose
             </div>
 
             {/* Modals */}
+            <ConfirmModal
+                isOpen={isBlockModalOpen}
+                onClose={() => setIsBlockModalOpen(false)}
+                onConfirm={async () => {
+                    if (partner) {
+                        try {
+                            await blockUser(partner.id);
+                        } catch {
+                            // error in store
+                        }
+                    }
+                }}
+                title="Xác nhận chặn"
+                message={`Bạn có chắc chắn muốn chặn "${displayName}"? Người này sẽ không thể nhắn tin cho bạn và bạn cũng không thể nhắn tin cho họ. Bạn bè vẫn được giữ nguyên trong danh sách.`}
+                confirmText="Chặn"
+                isDanger={true}
+            />
             <ConfirmModal
                 isOpen={isClearHistoryModalOpen}
                 onClose={() => setIsClearHistoryModalOpen(false)}
