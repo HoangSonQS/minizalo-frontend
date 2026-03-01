@@ -23,10 +23,19 @@ export default function GlobalSearchMobileScreen() {
         useLocalSearchParams?: () => Record<string, unknown>;
     };
     const rawParams = useLocalSearchParams ? useLocalSearchParams() : {};
-    const initialQuery =
-        typeof (rawParams as { q?: unknown }).q === "string"
-            ? ((rawParams as { q?: string }).q as string)
-            : "";
+    const params = rawParams as { q?: string; from?: string; t?: number };
+    const initialQuery = typeof params.q === "string" ? params.q : "";
+    const from = params.from || "contacts";
+
+    const handleBack = () => {
+        if (from === "account") {
+            router.replace("/(tabs)/account");
+        } else if (from === "chat") {
+            router.replace("/(tabs)/");
+        } else {
+            router.replace("/(tabs)/contacts");
+        }
+    };
 
     return (
         <SafeAreaView
@@ -45,7 +54,7 @@ export default function GlobalSearchMobileScreen() {
                 }}
             >
                 <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={handleBack}
                     style={{ padding: 4, marginRight: 8 }}
                     activeOpacity={0.8}
                 >
@@ -66,9 +75,12 @@ export default function GlobalSearchMobileScreen() {
                 </Text>
             </View>
 
-            {/* Nội dung: dùng lại SearchUsersMobile với initialQuery.
-                Khi mở từ thanh tìm kiếm chính, initialQuery thường rỗng và ô search sẽ tự focus. */}
-            <SearchUsersMobile initialQuery={initialQuery} autoFocus />
+            {/* Nội dung: key theo from+t để mỗi lần mở từ giao diện chính ô tìm kiếm luôn rỗng. */}
+            <SearchUsersMobile
+                key={`search-${from}-${params.t ?? ""}`}
+                initialQuery={initialQuery}
+                autoFocus
+            />
         </SafeAreaView>
     );
 }

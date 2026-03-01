@@ -82,8 +82,11 @@ export default function ProfileScreen({ user }: ProfileScreenProps) {
                         onChangeText={setSearchQuery}
                         showSoftInputOnFocus={false}
                         onFocus={() => {
-                            router.push("/(tabs)/contacts-search");
                             setSearchQuery("");
+                            router.push({
+                                pathname: "/(tabs)/contacts-search",
+                                params: { from: "account", t: Date.now() },
+                            });
                         }}
                     />
                     {searchQuery ? (
